@@ -6,3 +6,6 @@
 
 # flamegraph
 *.svg
+
+# cargo
+.cargo/config.toml
