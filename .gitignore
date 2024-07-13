@@ -1,0 +1,8 @@
+# binaries
+/target
+
+# vscode
+.history
+
+# flamegraph
+*.svg
