@@ -18,6 +18,7 @@ impl HomSet {
 }
 
 impl Set<Vec<usize>> for HomSet {
+    #[inline(always)]
     fn iter(&self) -> impl StreamingIterator<Item = Vec<usize>> {
         let sizes = vec![self.target_size; self.source_size];
         TupleStreamingIterator::new(sizes)

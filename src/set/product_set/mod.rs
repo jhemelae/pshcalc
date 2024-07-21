@@ -27,6 +27,7 @@ impl TupleStreamingIterator {
 impl StreamingIterator for TupleStreamingIterator {
     type Item = Vec<usize>;
 
+    #[inline(always)]
     fn advance(&mut self) {
         match self.state {
             IteratorState::Start => {
@@ -48,6 +49,7 @@ impl StreamingIterator for TupleStreamingIterator {
         }
     }
 
+    #[inline(always)]
     fn get(&self) -> Option<&Self::Item> {
         match self.state {
             IteratorState::Start => None,
