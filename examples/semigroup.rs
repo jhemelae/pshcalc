@@ -39,13 +39,13 @@ fn is_associative(s: &[usize], n: usize) -> bool {
 
 fn main() {
     let start = Instant::now();
-    let n: usize = 3;
+    let n: usize = 4;
     let size = n * n;
     
     let mut array = vec![0; size];
 
     let mut count = 0;
-    for _i in 0..n.pow(n.pow(2) as u32) {
+    for _i in 0..n.pow(size as u32) {
         if is_associative(&array, n) {
             count += 1;
         }
