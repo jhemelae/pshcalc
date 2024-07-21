@@ -58,6 +58,41 @@ impl StreamingIterator for TupleStreamingIterator {
     }
 }
 
+struct ProductSet {
+    sizes: Vec<usize>,
+}
+
+impl ProductSet {
+    fn new(sizes: Vec<usize>) -> Self {
+        Self { sizes }
+    }
+
+    fn iter(&self) -> TupleStreamingIterator {
+        TupleStreamingIterator::new(self.sizes.clone())
+    }
+}
+
+struct HomSet {
+    source_size: usize,
+    target_size: usize,
+}
+
+impl HomSet {
+    fn new(source_size: usize, target_size: usize) -> Self {
+        Self {
+            source_size,
+            target_size,
+        }
+    }
+
+    fn iter(&self) -> TupleStreamingIterator {
+        let sizes = vec![self.target_size; self.source_size];
+        TupleStreamingIterator::new(sizes)
+    }
+}
+
+
+
 #[inline(always)]
 fn get(s: &[usize], n: usize, i: usize, j: usize) -> usize {
         s[n * i + j]
@@ -82,14 +117,14 @@ fn is_associative(s: &[usize], n: usize) -> bool {
 fn main() {
     let start = Instant::now();
     let n: usize = 4;
-    let size = n * n;
 
-    let mut iterator = TupleStreamingIterator::new(
-        vec![n;size]
-    );
+    let mut multiplication = HomSet::new(
+        n*n,
+        n
+    ).iter();
 
     let mut count = 0;
-    while let Some(array) = iterator.next() {
+    while let Some(array) = multiplication.next() {
         if is_associative(&array, n) {
             count += 1;
         }
