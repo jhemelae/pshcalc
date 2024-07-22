@@ -6,3 +6,7 @@ pub mod hom_set;
 pub trait Set<T> {
     fn iter(&self) -> impl StreamingIterator<Item = T>;
 }
+
+pub trait Element {
+    fn index(&self) -> usize;
+}
