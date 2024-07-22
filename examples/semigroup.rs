@@ -31,13 +31,9 @@ fn main() {
         n*n,
         n
     );
-    let mut iter = multiplications.iter();
-    let mut count = 0;
-    while let Some(array) = iter.next() {
-        if is_associative(&array, n) {
-            count += 1;
-        }
-    }
+    let count = multiplications.iter().filter(
+        |s| is_associative(s, n)
+    ).count();
     println!("Count = {:?}", count);
 
     let duration = start.elapsed();
