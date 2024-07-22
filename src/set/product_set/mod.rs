@@ -3,16 +3,16 @@ use crate::set::Set;
 use crate::set::Element;
 
 pub struct Tuple<'set> {
-    pub current: Vec<usize>,
+    pub entries: Vec<usize>,
     pub set: &'set ProductSet,
 }
 
 impl<'set> Tuple<'set> {
     fn new(set: &'set ProductSet) -> Self {
         let sizes = &set.sizes;
-        let current = vec![0; sizes.len()];
+        let entries = vec![0; sizes.len()];
         Self { 
-            current,
+            entries,
             set,
         }
     }
@@ -25,8 +25,8 @@ impl<'set> Element<'set> for Tuple<'set> {
         // Convention:
         // the first element of the tuple is the least significant
         // (little-endian)
-        for i in 0..self.current.len() {
-            index += self.current[i] * factor;
+        for i in 0..self.entries.len() {
+            index += self.entries[i] * factor;
             factor *= self.set.sizes[i];
         }
         index
@@ -64,11 +64,11 @@ impl<'set> StreamingIterator for TupleStreamingIterator<'set> {
                 self.state = IteratorState::Running;
             }
             IteratorState::Running => {
-                let array = &mut self.element.current;
-                for i in 0..array.len() {
-                    array[i] += 1;
-                    if array[i] == self.element.set.sizes[i] {
-                        array[i] = 0;
+                let array = &mut self.element.entries;
+                for (i, entry) in array.iter_mut().enumerate(){
+                    *entry += 1;
+                    if *entry == self.element.set.sizes[i] {
+                        *entry = 0;
                     } else {
                         return;
                     }
@@ -97,10 +97,14 @@ impl ProductSet {
     pub fn new(sizes: Vec<usize>) -> Self {
         Self { sizes }
     }
+
+    pub fn tuple(&self) -> Tuple {
+        Tuple::new(self)
+    }
 }
 
 impl<'set> Set<'set, Tuple<'set>> for ProductSet {
     fn iter(&'set self) -> impl StreamingIterator<Item = Tuple<'set>> {
-        TupleStreamingIterator::new(&self)
+        TupleStreamingIterator::new(self)
     }
 }
