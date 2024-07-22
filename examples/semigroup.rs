@@ -32,7 +32,7 @@ fn main() {
         n
     );
     let count = multiplications.iter().filter(
-        |s| is_associative(s, n)
+        |tuple| is_associative(&tuple.current, n)
     ).count();
     println!("Count = {:?}", count);
 
