@@ -1,20 +1,6 @@
 use std::time::Instant;
-
-#[inline(always)]
-fn next(x: &mut [usize], n: usize) {
-    for i in 0..x.len() {
-        // Unsafe block to avoid bounds checks within the loop
-        unsafe {
-            let elem = x.get_unchecked_mut(i);
-            *elem += 1;
-            if *elem == n {
-                *elem = 0;
-            } else {
-                break;
-            }
-        }
-    }
-}
+use pshcalc::prelude::*;
+use pshcalc::set::hom_set::HomSet;
 
 #[inline(always)]
 fn get(s: &[usize], n: usize, i: usize, j: usize) -> usize {
@@ -40,16 +26,17 @@ fn is_associative(s: &[usize], n: usize) -> bool {
 fn main() {
     let start = Instant::now();
     let n: usize = 4;
-    let size = n * n;
-    
-    let mut array = vec![0; size];
 
+    let multiplications = HomSet::new(
+        n*n,
+        n
+    );
+    let mut iter = multiplications.iter();
     let mut count = 0;
-    for _i in 0..n.pow(size as u32) {
+    while let Some(array) = iter.next() {
         if is_associative(&array, n) {
             count += 1;
         }
-        next(&mut array, n);
     }
     println!("Count = {:?}", count);
 
