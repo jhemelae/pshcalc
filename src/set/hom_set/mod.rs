@@ -1,27 +1,27 @@
 use streaming_iterator::StreamingIterator;
 
 use crate::set::Set;
+use crate::set::product_set::ProductSet;
 use crate::set::product_set::TupleStreamingIterator;
 use crate::set::product_set::Tuple;
 
 pub struct HomSet {
-    source_size: usize,
-    target_size: usize,
+    underlying_product_set: ProductSet,
 }
 
-impl HomSet {
+impl<'set> HomSet {
     pub fn new(source_size: usize, target_size: usize) -> Self {
+        let sizes = vec![target_size; source_size];
+        let underlying_product_set = ProductSet::new(sizes);
         Self {
-            source_size,
-            target_size,
+            underlying_product_set,
         }
     }
 }
 
-impl Set<Tuple> for HomSet {
+impl<'set> Set<'set, Tuple<'set>> for HomSet {
     #[inline(always)]
-    fn iter(&self) -> impl StreamingIterator<Item = Tuple> {
-        let sizes = vec![self.target_size; self.source_size];
-        TupleStreamingIterator::new(sizes)
+    fn iter(&'set self) -> impl StreamingIterator<Item = Tuple<'set>> {
+        TupleStreamingIterator::new(&self.underlying_product_set)
     }
 }
