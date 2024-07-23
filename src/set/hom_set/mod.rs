@@ -37,6 +37,10 @@ impl HomSet {
 impl<'set> Set<'set> for HomSet {
     type Element = Tuple<'set>;
 
+    fn size(&self) -> usize {
+        self.underlying_product_set.size()
+    }
+
     #[inline(always)]
     fn iter(&'set self) -> impl StreamingIterator<Item = Self::Element> {
         TupleStreamingIterator::new(&self.underlying_product_set)

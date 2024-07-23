@@ -80,6 +80,10 @@ impl BasicSet {
 impl<'set> Set<'set> for BasicSet {
     type Element = Index<'set>;
 
+    fn size(&self) -> usize {
+        self.size
+    }
+
     fn iter(&'set self) -> impl StreamingIterator<
         Item = Self::Element,
     > {

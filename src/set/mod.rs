@@ -7,6 +7,8 @@ pub(crate) mod utils;
 pub trait Set<'set> {
     type Element: Element<'set>;
 
+    fn size(&self) -> usize;
+
     fn iter(&'set self) -> impl StreamingIterator<
         Item = Self::Element,
     >;
