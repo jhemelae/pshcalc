@@ -1,6 +1,7 @@
 use streaming_iterator::StreamingIterator;
 use crate::set::Set;
 use crate::set::Element;
+use crate::set::utils::IteratorState;
 
 pub struct Tuple<'set> {
     pub entries: Vec<usize>,
@@ -31,12 +32,6 @@ impl<'set> Element<'set> for Tuple<'set> {
         }
         index
     }
-}
-
-enum IteratorState {
-    Start,
-    Running,
-    End,
 }
 
 pub struct TupleStreamingIterator<'set> {
