@@ -2,31 +2,32 @@ use streaming_iterator::StreamingIterator;
 use crate::set::Set;
 use crate::set::Element;
 
-pub struct Tuple {
-    pub current: Vec<usize>,
-    sizes: Vec<usize>,
+pub struct Tuple<'set> {
+    pub entries: Vec<usize>,
+    pub set: &'set ProductSet,
 }
 
-impl Tuple {
-    fn new(sizes: Vec<usize>) -> Self {
-        let current = vec![0; sizes.len()];
+impl<'set> Tuple<'set> {
+    fn new(set: &'set ProductSet) -> Self {
+        let sizes = &set.sizes;
+        let entries = vec![0; sizes.len()];
         Self { 
-            current: current,
-            sizes: sizes
+            entries,
+            set,
         }
     }
 }
 
-impl Element for Tuple {
+impl<'set> Element<'set> for Tuple<'set> {
     fn index(&self) -> usize {
         let mut index = 0;
         let mut factor = 1;
         // Convention:
         // the first element of the tuple is the least significant
         // (little-endian)
-        for i in 0..self.current.len() {
-            index += self.current[i] * factor;
-            factor *= self.sizes[i];
+        for i in 0..self.entries.len() {
+            index += self.entries[i] * factor;
+            factor *= self.set.sizes[i];
         }
         index
     }
@@ -38,14 +39,14 @@ enum IteratorState {
     End,
 }
 
-pub struct TupleStreamingIterator {
+pub struct TupleStreamingIterator<'set> {
     state: IteratorState,
-    element: Tuple,
+    element: Tuple<'set>,
 }
 
-impl TupleStreamingIterator {
-    pub fn new(sizes: Vec<usize>) -> Self {
-        let element = Tuple::new(sizes);
+impl<'set> TupleStreamingIterator<'set> {
+    pub fn new(set: &'set ProductSet) -> Self {
+        let element = Tuple::new(set);
         Self {
             state: IteratorState::Start,
             element,
@@ -53,8 +54,8 @@ impl TupleStreamingIterator {
     }
 }
 
-impl StreamingIterator for TupleStreamingIterator {
-    type Item = Tuple;
+impl<'set> StreamingIterator for TupleStreamingIterator<'set> {
+    type Item = Tuple<'set>;
 
     #[inline(always)]
     fn advance(&mut self) {
@@ -63,11 +64,11 @@ impl StreamingIterator for TupleStreamingIterator {
                 self.state = IteratorState::Running;
             }
             IteratorState::Running => {
-                let array = &mut self.element.current;
-                for i in 0..array.len() {
-                    array[i] += 1;
-                    if array[i] == self.element.sizes[i] {
-                        array[i] = 0;
+                let array = &mut self.element.entries;
+                for (i, entry) in array.iter_mut().enumerate(){
+                    *entry += 1;
+                    if *entry == self.element.set.sizes[i] {
+                        *entry = 0;
                     } else {
                         return;
                     }
@@ -96,10 +97,16 @@ impl ProductSet {
     pub fn new(sizes: Vec<usize>) -> Self {
         Self { sizes }
     }
+
+    pub fn tuple(&self) -> Tuple {
+        Tuple::new(self)
+    }
 }
 
-impl Set<Tuple> for ProductSet {
-    fn iter(&self) -> impl StreamingIterator<Item = Tuple> {
-        TupleStreamingIterator::new(self.sizes.clone())
+impl<'set> Set<'set> for ProductSet {
+    type Element = Tuple<'set>;
+
+    fn iter(&'set self) -> impl StreamingIterator<Item = Self::Element> {
+        TupleStreamingIterator::new(self)
     }
 }
