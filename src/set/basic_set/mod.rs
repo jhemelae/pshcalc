@@ -1,7 +1,10 @@
+use streaming_iterator::StreamingIterator;
+
 use crate::set::Set;
+use crate::set::Element;
 use crate::set::utils::IteratorState;
 
-struct Index<'set> {
+pub struct Index<'set> {
     pub index: usize,
     pub set: &'set BasicSet,
 }
@@ -65,7 +68,7 @@ impl<'set> StreamingIterator for USizeStreamingIterator<'set> {
     }
 }
 
-struct BasicSet {
+pub struct BasicSet {
     pub size: usize,
 }
 

@@ -24,10 +24,15 @@ pub struct HomSet {
     underlying_product_set: ProductSet,
 }
 
-impl HomSet {
-    pub fn new(source_size: usize, target_size: usize) -> Self {
+impl<'source, 'target> HomSet {
+    pub fn new(
+        source: &impl Set<'source>,
+        target: &impl Set<'target>,
+    ) -> Self {
+        let source_size = source.size();
+        let target_size = target.size();
         let sizes = vec![target_size; source_size];
-        let underlying_product_set = ProductSet::new(sizes);
+        let underlying_product_set = ProductSet::from_sizes(sizes);
         Self {
             underlying_product_set,
         }

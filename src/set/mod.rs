@@ -1,5 +1,6 @@
 pub use streaming_iterator::StreamingIterator;
 
+pub mod basic_set;
 pub mod product_set;
 pub mod hom_set;
 pub(crate) mod utils;

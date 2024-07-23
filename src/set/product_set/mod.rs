@@ -88,8 +88,16 @@ pub struct ProductSet {
     sizes: Vec<usize>,
 }
 
-impl ProductSet {
-    pub fn new(sizes: Vec<usize>) -> Self {
+impl<'set> ProductSet {
+    pub fn new(sets: &[&impl Set<'set>]) -> Self {
+        let sizes = sets
+            .iter()
+            .map(|set| set.size())
+            .collect();
+        Self { sizes }
+    }
+
+    pub(crate) fn from_sizes(sizes: Vec<usize>) -> Self {
         Self { sizes }
     }
 }
