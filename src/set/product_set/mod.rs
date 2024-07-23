@@ -103,8 +103,10 @@ impl ProductSet {
     }
 }
 
-impl<'set> Set<'set, Tuple<'set>> for ProductSet {
-    fn iter(&'set self) -> impl StreamingIterator<Item = Tuple<'set>> {
+impl<'set> Set<'set> for ProductSet {
+    type Element = Tuple<'set>;
+
+    fn iter(&'set self) -> impl StreamingIterator<Item = Self::Element> {
         TupleStreamingIterator::new(self)
     }
 }

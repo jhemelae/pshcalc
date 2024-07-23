@@ -3,8 +3,12 @@ pub use streaming_iterator::StreamingIterator;
 pub mod product_set;
 pub mod hom_set;
 
-pub trait Set<'set, T: Element<'set>> {
-    fn iter(&'set self) -> impl StreamingIterator<Item = T>;
+pub trait Set<'set> {
+    type Element: Element<'set>;
+
+    fn iter(&'set self) -> impl StreamingIterator<
+        Item = Self::Element,
+    >;
 }
 
 pub trait Element<'set> {

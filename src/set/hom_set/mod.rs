@@ -19,7 +19,9 @@ impl HomSet {
     }
 }
 
-impl<'set> Set<'set, Tuple<'set>> for HomSet {
+impl<'set> Set<'set> for HomSet {
+    type Element = Tuple<'set>;
+    fn iter(&'set self) -> impl StreamingIterator<Item = Self::Element> {
     #[inline(always)]
     fn iter(&'set self) -> impl StreamingIterator<Item = Tuple<'set>> {
         TupleStreamingIterator::new(&self.underlying_product_set)
