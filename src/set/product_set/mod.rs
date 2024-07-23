@@ -92,10 +92,6 @@ impl ProductSet {
     pub fn new(sizes: Vec<usize>) -> Self {
         Self { sizes }
     }
-
-    pub fn tuple(&self) -> Tuple {
-        Tuple::new(self)
-    }
 }
 
 impl<'set> Set<'set> for ProductSet {
