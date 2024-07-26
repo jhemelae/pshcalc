@@ -19,7 +19,7 @@ impl<'set> Tuple<'set> {
     }
 }
 
-impl<'set> Element<'set> for Tuple<'set> {
+impl<'set> Element for Tuple<'set> {
     fn index(&self) -> usize {
         let mut index = 0;
         let mut factor = 1;
@@ -89,7 +89,7 @@ pub struct ProductSet {
 }
 
 impl<'set> ProductSet {
-    pub fn new(sets: &[&impl Set<'set>]) -> Self {
+    pub fn new(sets: &[&impl Set]) -> Self {
         let sizes = sets
             .iter()
             .map(|set| set.size())
@@ -102,14 +102,14 @@ impl<'set> ProductSet {
     }
 }
 
-impl<'set> Set<'set> for ProductSet {
+impl Set for ProductSet {
     type Element = Tuple<'set>;
 
     fn size(&self) -> usize {
         self.sizes.iter().product()
     }
 
-    fn iter(&'set self) -> impl StreamingIterator<Item = Self::Element> {
+    fn iter(&self) -> impl StreamingIterator<Item = Self::Element> {
         TupleStreamingIterator::new(self)
     }
 }

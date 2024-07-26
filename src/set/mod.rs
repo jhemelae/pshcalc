@@ -5,16 +5,16 @@ pub mod product_set;
 pub mod hom_set;
 pub(crate) mod utils;
 
-pub trait Set<'set> {
-    type Element: Element<'set>;
+pub trait Set {
+    type Element: Element;
 
     fn size(&self) -> usize;
 
-    fn iter(&'set self) -> impl StreamingIterator<
+    fn iter(&self) -> impl StreamingIterator<
         Item = Self::Element,
     >;
 }
 
-pub trait Element<'set> {
+pub trait Element {
     fn index(&self) -> usize;
 }
