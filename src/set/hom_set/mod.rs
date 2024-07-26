@@ -5,19 +5,10 @@ use crate::set::product_set::ProductSet;
 use crate::set::product_set::TupleStreamingIterator;
 use crate::set::product_set::Tuple;
 
-pub struct Function<
-    'source,
-    'target,
-    SourceSet,
-    TargetSet,
->
-where
-    SourceSet: Set<'source, >,
-    TargetSet: Set<'target, >,
+pub struct Function<'set>
 {
-    pub source: &'source SourceSet,
-    pub target: &'target TargetSet,
     pub entries: Vec<usize>,
+    pub set: &'set HomSet,
 }
 
 pub struct HomSet {
