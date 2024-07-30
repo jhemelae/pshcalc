@@ -6,13 +6,9 @@ pub mod hom_set;
 pub(crate) mod utils;
 
 pub trait Set {
-    type Element: Element;
-
     fn size(&self) -> usize;
 
-    fn iter(&self) -> impl StreamingIterator<
-        Item = Self::Element,
-    >;
+    fn iter(&self) -> impl StreamingIterator;
 }
 
 pub trait Element {
