@@ -1,8 +1,14 @@
 use streaming_iterator::StreamingIterator;
 
-use crate::set::Set;
-use crate::set::Element;
-use crate::set::utils::IteratorState;
+use crate::set::{
+    Set,
+    Element,
+};
+use crate::set::utils::{
+    IteratorState,
+    IntTicker,
+    Ticker,
+};
 
 pub struct Index<'set> {
     pub index: usize,
@@ -24,12 +30,12 @@ impl<'set> Element<'set> for Index<'set> {
     }
 }
 
-struct USizeStreamingIterator<'set> {
+struct IndexStreamingIterator<'set> {
     state: IteratorState,
     element: Index<'set>,
 }
 
-impl<'set> USizeStreamingIterator<'set> {
+impl<'set> IndexStreamingIterator<'set> {
     pub fn new(set: &'set BasicSet) -> Self {
         let element = Index::new(set);
         Self {
@@ -39,31 +45,24 @@ impl<'set> USizeStreamingIterator<'set> {
     }
 }
 
-impl<'set> StreamingIterator for USizeStreamingIterator<'set> {
+impl<'set> StreamingIterator for IndexStreamingIterator<'set> {
     type Item = Index<'set>;
 
     #[inline(always)]
     fn advance(&mut self) {
-        match self.state {
-            IteratorState::Start => {
-                self.state = IteratorState::Running;
-            }
-            IteratorState::Running => {
-                self.element.index += 1;
-                if self.element.index == self.element.set.size {
-                    self.state = IteratorState::End;
-                }
-            }
-            IteratorState::End => {}
-        }
+        let mut ticker = IntTicker::new(
+            &mut self.state,
+            &mut self.element.index,
+            &self.element.set.size,
+        );
+        ticker.advance();
     }
 
     #[inline(always)]
     fn get(&self) -> Option<&Self::Item> {
         match self.state {
-            IteratorState::Start => None,
             IteratorState::Running => Some(&self.element),
-            IteratorState::End => None,
+            _ => None,
         }
     }
 }
@@ -90,6 +89,6 @@ impl<'set> Set<'set> for BasicSet {
     fn iter(&'set self) -> impl StreamingIterator<
         Item = Self::Element,
     > {
-        USizeStreamingIterator::new(self)
+        IndexStreamingIterator::new(self)
     }
 }

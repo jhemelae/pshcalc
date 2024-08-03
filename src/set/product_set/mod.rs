@@ -1,7 +1,13 @@
 use streaming_iterator::StreamingIterator;
-use crate::set::Set;
-use crate::set::Element;
-use crate::set::utils::IteratorState;
+use crate::set::{
+    Set,
+    Element,
+};
+use crate::set::utils::{
+    IteratorState,
+    ArrayTicker,
+    Ticker,
+};
 
 pub struct Tuple<'set> {
     pub entries: Vec<usize>,
@@ -54,32 +60,19 @@ impl<'set> StreamingIterator for TupleStreamingIterator<'set> {
 
     #[inline(always)]
     fn advance(&mut self) {
-        match self.state {
-            IteratorState::Start => {
-                self.state = IteratorState::Running;
-            }
-            IteratorState::Running => {
-                let array = &mut self.element.entries;
-                for (i, entry) in array.iter_mut().enumerate(){
-                    *entry += 1;
-                    if *entry == self.element.set.sizes[i] {
-                        *entry = 0;
-                    } else {
-                        return;
-                    }
-                }
-                self.state = IteratorState::End;
-            }
-            IteratorState::End => {}
-        }
+        let mut ticker = ArrayTicker::new(
+            &mut self.state,
+            &mut self.element.entries,
+            &self.element.set.sizes,
+        );
+        ticker.advance();
     }
 
     #[inline(always)]
     fn get(&self) -> Option<&Self::Item> {
         match self.state {
-            IteratorState::Start => None,
             IteratorState::Running => Some(&self.element),
-            IteratorState::End => None,
+            _ => None,
         }
     }
 }
@@ -94,10 +87,6 @@ impl<'set> ProductSet {
             .iter()
             .map(|set| set.size())
             .collect();
-        Self { sizes }
-    }
-
-    pub(crate) fn from_sizes(sizes: Vec<usize>) -> Self {
         Self { sizes }
     }
 }
