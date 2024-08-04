@@ -11,7 +11,7 @@ use crate::set::utils::{
 
 pub struct Tuple<'set> {
     pub entries: Vec<usize>,
-    pub set: &'set ProductSet,
+    pub sizes: &'set Vec<usize>,
 }
 
 impl<'set> Tuple<'set> {
@@ -20,7 +20,7 @@ impl<'set> Tuple<'set> {
         let entries = vec![0; sizes.len()];
         Self { 
             entries,
-            set,
+            sizes,
         }
     }
 }
@@ -34,7 +34,7 @@ impl<'set> Element<'set> for Tuple<'set> {
         // (little-endian)
         for i in 0..self.entries.len() {
             index += self.entries[i] * factor;
-            factor *= self.set.sizes[i];
+            factor *= self.sizes[i];
         }
         index
     }
@@ -63,7 +63,7 @@ impl<'set> StreamingIterator for TupleStreamingIterator<'set> {
         let mut ticker = ArrayTicker::new(
             &mut self.state,
             &mut self.element.entries,
-            &self.element.set.sizes,
+            self.element.sizes,
         );
         ticker.advance();
     }
