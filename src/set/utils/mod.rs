@@ -92,3 +92,20 @@ impl<'a> Ticker for ArrayTicker<'a> {
         }
     }
 }
+
+#[inline(always)]
+pub(crate) fn little_endian_index(
+    entries: &[usize],
+    sizes: &[usize]
+) -> usize {
+    let mut index = 0;
+    let mut factor = 1;
+    // Convention:
+    // the first element of the tuple is the least significant
+    // (little-endian)
+    for i in 0..entries.len() {
+        index += entries[i] * factor;
+        factor *= sizes[i];
+    }
+    index
+}

@@ -7,6 +7,7 @@ use crate::set::utils::{
     IteratorState,
     ArrayTicker,
     Ticker,
+    little_endian_index,
 };
 
 pub struct Tuple<'set> {
@@ -27,16 +28,7 @@ impl<'set> Tuple<'set> {
 
 impl<'set> Element<'set> for Tuple<'set> {
     fn index(&self) -> usize {
-        let mut index = 0;
-        let mut factor = 1;
-        // Convention:
-        // the first element of the tuple is the least significant
-        // (little-endian)
-        for i in 0..self.entries.len() {
-            index += self.entries[i] * factor;
-            factor *= self.sizes[i];
-        }
-        index
+        little_endian_index(&self.entries, self.sizes)
     }
 }
 
