@@ -8,19 +8,17 @@ fn get(s: &[usize], n: usize, i: usize, j: usize) -> usize {
 }
 
 #[inline(always)]
-fn is_associative(s: &[usize], n: usize) -> bool {
-    for i in 0..n {
-        for j in 0..n {
-            for k in 0..n {
-                let left = get(s, n, get(s, n, i, j), k);
-                let right = get(s, n, i, get(s, n, j, k));
-                if left != right {
-                    return false;
-                }
-            }
-        }
-    }
-    true
+fn is_associative(a: &set::Basic, s: &[usize]) -> bool {
+    a.iter().all(|i| {
+        a.iter().all(|j| {
+            a.iter().all(|k| {
+                let n = a.size;
+                let left = get(s, n, get(s, n, *i, *j), *k);
+                let right = get(s, n, *i, get(s, n, *j, *k));
+                left==right
+            })
+        })
+    })
 }
 
 fn main() {
@@ -34,7 +32,7 @@ fn main() {
         &a
     );
     let count = multiplications.iter().filter(
-        |f| is_associative(&f, n)
+        |f| is_associative(&a,&f)
     ).count();
     println!("Count = {:?}", count);
 
