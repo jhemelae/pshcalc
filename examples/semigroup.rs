@@ -1,8 +1,6 @@
 use std::time::Instant;
 use pshcalc::prelude::*;
-use pshcalc::set::basic_set::BasicSet;
-use pshcalc::set::hom_set::HomSet;
-use pshcalc::set::product_set::ProductSet;
+use pshcalc::set;
 
 #[inline(always)]
 fn get(s: &[usize], n: usize, i: usize, j: usize) -> usize {
@@ -28,10 +26,10 @@ fn is_associative(s: &[usize], n: usize) -> bool {
 fn main() {
     let start = Instant::now();
     let n = 4;
-    let a = BasicSet::new(n);
-    let a_x_a = ProductSet::new(&[&a, &a]);
+    let a = set::Basic::new(n);
+    let a_x_a = set::Product::new(&[&a, &a]);
 
-    let multiplications = HomSet::new(
+    let multiplications = set::Hom::new(
         &a_x_a,
         &a
     );
