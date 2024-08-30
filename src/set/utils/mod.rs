@@ -75,57 +75,13 @@ impl<'set> StreamingIterator for VecStreamingIterator<'set> {
 
     #[inline(always)]
     fn advance(&mut self) {
-        let mut ticker = ArrayTicker::new(
-            &mut self.state,
-            &mut self.entries,
-            self.sizes,
-        );
-        ticker.advance();
-    }
-
-    #[inline(always)]
-    fn get(&self) -> Option<&Self::Item> {
-        match self.state {
-            IteratorState::End => None,
-            _ => Some(&self.entries),
-        }
-    }
-}
-
-pub(crate) trait Ticker {
-    fn advance(&mut self);
-}
-
-pub(crate) struct ArrayTicker<'a> {
-    state: &'a mut IteratorState,
-    array: &'a mut Vec<usize>,
-    sizes: &'a Vec<usize>,
-}
-
-impl<'a> ArrayTicker<'a> {
-    pub fn new(
-        state: &'a mut IteratorState,
-        array: &'a mut Vec<usize>,
-        sizes: &'a Vec<usize>
-    ) -> Self {
-        Self {
-            state,
-            array,
-            sizes,
-        }
-    }
-}
-
-impl<'a> Ticker for ArrayTicker<'a> {
-    #[inline(always)]
-    fn advance(&mut self) {
         match self.state {
             IteratorState::Start => {
-                *self.state = IteratorState::Running;
+                self.state = IteratorState::Running;
             }
             IteratorState::Running => {
                 for (i, entry) 
-                in self.array.iter_mut().enumerate() {
+                in self.entries.iter_mut().enumerate() {
                     *entry += 1;
                     if *entry == self.sizes[i] {
                         *entry = 0;
@@ -133,9 +89,17 @@ impl<'a> Ticker for ArrayTicker<'a> {
                         return;
                     }
                 }
-                *self.state = IteratorState::End;
+                self.state = IteratorState::End;
             }
             IteratorState::End => {}
+        }
+    }
+
+    #[inline(always)]
+    fn get(&self) -> Option<&Self::Item> {
+        match self.state {
+            IteratorState::End => None,
+            _ => Some(&self.entries),
         }
     }
 }

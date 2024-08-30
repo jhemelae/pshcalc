@@ -25,7 +25,6 @@ impl<'set> Set<'set> for HomSet {
         self.sizes.iter().product()
     }
 
-    #[inline(always)]
     fn iter(&'set self) -> impl StreamingIterator<Item = Self::Element> {
         VecStreamingIterator::new(&self.sizes)
     }
