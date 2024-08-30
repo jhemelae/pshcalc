@@ -36,7 +36,7 @@ fn main() {
         &a
     );
     let count = multiplications.iter().filter(
-        |f| is_associative(&f.entries, n)
+        |f| is_associative(&f, n)
     ).count();
     println!("Count = {:?}", count);
 

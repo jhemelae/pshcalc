@@ -1,52 +1,99 @@
+use streaming_iterator::StreamingIterator;
+
 pub(crate) enum IteratorState {
     Start,
     Running,
     End,
 }
 
-pub(crate) trait Ticker {
-    fn advance(&mut self);
+pub(crate) struct USizeStreamingIterator {
+    state: IteratorState,
+    element: usize,
+    size: usize,
 }
 
-pub(crate) struct IntTicker<'a> {
-    state: &'a mut IteratorState,
-    int: &'a mut usize,
-    size: &'a usize,
-}
-
-impl<'a> IntTicker<'a> {
-    pub fn new(
-        state: &'a mut IteratorState,
-        int: &'a mut usize,
-        size: &'a usize
-    ) -> Self {
+impl USizeStreamingIterator {
+    pub fn new(size: usize) -> Self {
         Self {
-            state,
-            int,
+            state: IteratorState::Start,
+            element: 0,
             size,
         }
     }
 }
 
-impl<'a> Ticker for IntTicker<'a> {
+impl StreamingIterator for USizeStreamingIterator {
+    type Item = usize;
+
     #[inline(always)]
     fn advance(&mut self) {
         match self.state {
             IteratorState::Start => {
-                *self.state = IteratorState::Running;
+                self.state = IteratorState::Running;
             }
             IteratorState::Running => {
-                *self.int += 1;
-                if *self.int == *self.size {
+                self.element += 1;
+                if self.element == self.size {
                     // Reset the counter
-                    // (to be consistent with the array ticker behavior)
-                    *self.int = 0;
-                    *self.state = IteratorState::End;
+                    // (to be consistent with the array behavior)
+                    self.element = 0;
+                    self.state = IteratorState::End;
                 }
             }
             IteratorState::End => {}
         }
     }
+
+    #[inline(always)]
+    fn get(&self) -> Option<&Self::Item> {
+        match self.state {
+            IteratorState::Running => Some(&self.element),
+            _ => None,
+        }
+    }
+}
+
+pub struct VecStreamingIterator<'set> {
+    state: IteratorState,
+    entries: Vec<usize>,
+    sizes: &'set Vec<usize>,
+}
+
+impl<'set> VecStreamingIterator<'set> {
+    pub fn new(sizes: &'set Vec<usize>) -> Self {
+        let entries = vec![0; sizes.len()];
+        Self {
+            state: IteratorState::Start,
+            entries,
+            sizes,
+        }
+    }
+}
+
+impl<'set> StreamingIterator for VecStreamingIterator<'set> {
+    type Item = Vec<usize>;
+
+    #[inline(always)]
+    fn advance(&mut self) {
+        let mut ticker = ArrayTicker::new(
+            &mut self.state,
+            &mut self.entries,
+            self.sizes,
+        );
+        ticker.advance();
+    }
+
+    #[inline(always)]
+    fn get(&self) -> Option<&Self::Item> {
+        match self.state {
+            IteratorState::End => None,
+            _ => Some(&self.entries),
+        }
+    }
+}
+
+pub(crate) trait Ticker {
+    fn advance(&mut self);
 }
 
 pub(crate) struct ArrayTicker<'a> {
@@ -93,19 +140,19 @@ impl<'a> Ticker for ArrayTicker<'a> {
     }
 }
 
-#[inline(always)]
-pub(crate) fn little_endian_index(
-    entries: &[usize],
-    sizes: &[usize]
-) -> usize {
-    let mut index = 0;
-    let mut factor = 1;
-    // Convention:
-    // the first element of the tuple is the least significant
-    // (little-endian)
-    for i in 0..entries.len() {
-        index += entries[i] * factor;
-        factor *= sizes[i];
-    }
-    index
-}
+// #[inline(always)]
+// pub(crate) fn little_endian_index(
+//     entries: &[usize],
+//     sizes: &[usize]
+// ) -> usize {
+//     let mut index = 0;
+//     let mut factor = 1;
+//     // Convention:
+//     // the first element of the tuple is the least significant
+//     // (little-endian)
+//     for i in 0..entries.len() {
+//         index += entries[i] * factor;
+//         factor *= sizes[i];
+//     }
+//     index
+// }

@@ -10,11 +10,13 @@ pub trait Set<'set> {
 
     fn size(&self) -> usize;
 
+    #[allow(clippy::iter_not_returning_iterator)]
     fn iter(&'set self) -> impl StreamingIterator<
         Item = Self::Element,
     >;
 }
 
-pub trait Element<'set> {
-    fn index(&self) -> usize;
-}
+pub trait Element<'set> { }
+
+impl<'set> Element<'set> for usize { }
+impl<'set> Element<'set> for Vec<usize> { }
