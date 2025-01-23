@@ -1,10 +1,10 @@
-use std::time::Instant;
 use pshcalc::prelude::*;
 use pshcalc::set;
+use std::time::Instant;
 
 #[inline(always)]
 fn get(s: &[usize], n: usize, i: usize, j: usize) -> usize {
-        s[n * i + j]
+    s[n * i + j]
 }
 
 #[inline(always)]
@@ -29,13 +29,11 @@ fn main() {
     let a = set::Basic::new(n);
     let a_x_a = set::Product::new(&[&a, &a]);
 
-    let multiplications = set::Hom::new(
-        &a_x_a,
-        &a
-    );
-    let count = multiplications.iter().filter(
-        |f| is_associative(&f, n)
-    ).count();
+    let multiplications = set::Hom::new(&a_x_a, &a);
+    let count = multiplications
+        .iter()
+        .filter(|f| is_associative(&f, n))
+        .count();
     println!("Count = {:?}", count);
 
     let duration = start.elapsed();

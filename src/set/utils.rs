@@ -80,8 +80,7 @@ impl<'set> StreamingIterator for VecStreamingIterator<'set> {
                 self.state = IteratorState::Running;
             }
             IteratorState::Running => {
-                for (i, entry) 
-                in self.entries.iter_mut().enumerate() {
+                for (i, entry) in self.entries.iter_mut().enumerate() {
                     *entry += 1;
                     if *entry == self.sizes[i] {
                         *entry = 0;
