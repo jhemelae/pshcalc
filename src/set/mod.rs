@@ -2,103 +2,89 @@ pub use streaming_iterator::StreamingIterator;
 
 pub(crate) mod utils;
 
-use utils::{
-    USizeStreamingIterator,
-    VecStreamingIterator,
-};
+use utils::{USizeStreamingIterator, VecStreamingIterator};
 
-pub trait Element<'set> { }
+pub trait Element: PartialEq {}
 
-impl<'set> Element<'set> for usize { }
-impl<'set> Element<'set> for Vec<usize> { }
+impl Element for usize {}
+impl Element for Vec<usize> {}
 
-pub trait Set<'set> {
-    type Element: Element<'set>;
+pub trait Set: Clone {
+    type Element: Element;
 
     fn size(&self) -> usize;
 
     #[allow(clippy::iter_not_returning_iterator)]
-    fn iter(&'set self) -> impl StreamingIterator<
-        Item = Self::Element,
-    >;
+    fn iter(&self) -> impl StreamingIterator<Item = Self::Element>;
 }
 
+#[derive(Clone)]
 pub struct Basic {
     pub size: usize,
 }
 
 impl Basic {
     pub fn new(size: usize) -> Self {
-        Self {
-            size,
-        }
+        Self { size }
     }
 }
 
-impl<'set> Set<'set> for Basic {
+impl Set for Basic {
     type Element = usize;
 
     fn size(&self) -> usize {
         self.size
     }
 
-    fn iter(&'set self) -> impl StreamingIterator<
-        Item = Self::Element,
-    > {
+    fn iter(&self) -> impl StreamingIterator<Item = Self::Element> {
         USizeStreamingIterator::new(self.size)
     }
 }
 
+#[derive(Clone)]
 pub struct Product {
     sizes: Vec<usize>,
 }
 
-impl<'set> Product {
-    pub fn new(sets: &[&impl Set<'set>]) -> Self {
-        let sizes = sets
-            .iter()
-            .map(|set| set.size())
-            .collect();
+impl Product {
+    pub fn new(sets: &[&impl Set]) -> Self {
+        let sizes = sets.iter().map(|set| set.size()).collect();
         Self { sizes }
     }
 }
 
-impl<'set> Set<'set> for Product {
+impl Set for Product {
     type Element = Vec<usize>;
 
     fn size(&self) -> usize {
         self.sizes.iter().product()
     }
 
-    fn iter(&'set self) -> impl StreamingIterator<Item = Self::Element> {
+    fn iter(&self) -> impl StreamingIterator<Item = Self::Element> {
         VecStreamingIterator::new(&self.sizes)
     }
 }
 
+#[derive(Clone)]
 pub struct Hom {
     sizes: Vec<usize>,
 }
 
-impl<'set> Hom {
-    pub fn new(
-        source: &impl Set<'set>,
-        target: &impl Set<'set>,
-    ) -> Self {
+impl Hom {
+    pub fn new(source: &impl Set, target: &impl Set) -> Self {
         let sizes = vec![target.size(); source.size()];
-        Self {
-            sizes,
-        }
+        Self { sizes }
     }
 }
 
-impl<'set> Set<'set> for Hom {
+impl Set for Hom {
     type Element = Vec<usize>;
 
     fn size(&self) -> usize {
         self.sizes.iter().product()
     }
 
-    fn iter(&'set self) -> impl StreamingIterator<Item = Self::Element> {
+    fn iter(&self) -> impl StreamingIterator<Item = Self::Element> {
         VecStreamingIterator::new(&self.sizes)
     }
 }
