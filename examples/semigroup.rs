@@ -1,41 +1,33 @@
-use pshcalc::prelude::*;
-use pshcalc::set;
+use pshcalc::set::{
+    AssociativityChecker, AtomSet, HomSet, ProductSet, Variable, World,
+};
 use std::time::Instant;
-
-#[inline(always)]
-fn get(s: &[usize], n: usize, i: usize, j: usize) -> usize {
-    s[n * i + j]
-}
-
-#[inline(always)]
-fn is_associative(s: &[usize], n: usize) -> bool {
-    for i in 0..n {
-        for j in 0..n {
-            for k in 0..n {
-                let left = get(s, n, get(s, n, i, j), k);
-                let right = get(s, n, i, get(s, n, j, k));
-                if left != right {
-                    return false;
-                }
-            }
-        }
-    }
-    true
-}
 
 fn main() {
     let start = Instant::now();
+    let mut world = World::new();
     let n = 4;
-    let a = set::Basic::new(n);
-    let a_x_a = set::Product::new(&[&a, &a]);
 
-    let multiplications = set::Hom::new(&a_x_a, &a);
-    let count = multiplications
-        .iter()
-        .filter(|f| is_associative(&f, n))
-        .count();
+    let a = AtomSet::new(n);
+    let a_x_a = ProductSet::new(&[a.clone(), a.clone()]);
+    let multiplications = HomSet::new(&a_x_a, &a);
+
+    // Zero-allocation checker
+    let mut checker = AssociativityChecker::new(&mut world, n);
+
+    let mut function = multiplications.create_variable(&mut world);
+    function.initialize(&mut world);
+
+    let mut count = 0;
+    while let Some(f) = function.get() {
+        if checker.is_associative(&world, f) {
+            // if ultra_checker.is_associative(&world, f) {
+            count += 1;
+        }
+        function.advance(&mut world);
+    }
+
     println!("Count = {:?}", count);
-
     let duration = start.elapsed();
     println!("Time elapsed is: {:?}", duration);
 }
