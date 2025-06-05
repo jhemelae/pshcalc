@@ -955,6 +955,31 @@ pub trait Variable<T: Element> {
     fn get(&self) -> Option<&T>;
 }
 
+/// Trait for mathematical sets that can serve as domains or codomains.
+///
+/// This trait provides a uniform interface for different types of sets,
+/// enabling them to be used interchangeably in contexts like function
+/// definitions (HomSets) and other mathematical constructions.
+///
+/// # Implementors
+///
+/// - [`AtomSet`] - Finite sets of atomic elements
+/// - [`ProductSet`] - Cartesian products of other sets
+///
+/// # Mathematical Interpretation
+///
+/// In category theory and set theory, this trait represents the concept
+/// of a "set" or "object" that can participate in morphisms and other
+/// mathematical constructions.
+pub trait Set {
+    /// Returns the cardinality (number of elements) of this set.
+    ///
+    /// # Returns
+    ///
+    /// Number of elements in the set
+    fn size(&self) -> usize;
+}
+
 /// Mathematical set of atomic elements.
 ///
 /// An `AtomSet` represents a finite set A = {0, 1, 2, ..., size-1} of atomic
@@ -1020,6 +1045,13 @@ impl AtomSet {
     /// New [`AtomSetVariable`] for iterating through this set
     pub fn create_variable(&self, world: &mut World) -> AtomSetVariable {
         AtomSetVariable::new(world, self.size)
+    }
+}
+
+impl Set for AtomSet {
+    #[inline(always)]
+    fn size(&self) -> usize {
+        self.size
     }
 }
 
@@ -1116,6 +1148,13 @@ impl ProductSet {
     }
 }
 
+impl Set for ProductSet {
+    #[inline(always)]
+    fn size(&self) -> usize {
+        self.sizes.iter().product()
+    }
+}
+
 pub struct ProductSetVariable {
     done: bool,
     current: TupleHandle,
@@ -1170,7 +1209,34 @@ pub struct HomSet {
 }
 
 impl HomSet {
-    pub fn new(source: &ProductSet, target: &AtomSet) -> Self {
+    /// Creates a new HomSet representing functions from any set type to any set type.
+    ///
+    /// This method accepts any types implementing the [`Set`] trait, making it
+    /// flexible for different kinds of domains and codomains. In category theory,
+    /// this represents the hom-set Hom(A, B) of morphisms from object A to object B.
+    ///
+    /// # Arguments
+    ///
+    /// * `source` - Domain set (any type implementing [`Set`])
+    /// * `target` - Codomain set (any type implementing [`Set`])
+    ///
+    /// # Returns
+    ///
+    /// New HomSet with size target_size^domain_size
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use pshcalc::set::{AtomSet, ProductSet, HomSet};
+    /// let atom_set = AtomSet::new(3);
+    /// let product_set = ProductSet::new(&[AtomSet::new(2), AtomSet::new(2)]);
+    ///
+    /// // Both are now valid:
+    /// let hom1 = HomSet::new(&product_set, &atom_set); // ProductSet → AtomSet
+    /// let hom2 = HomSet::new(&atom_set, &atom_set);    // AtomSet → AtomSet
+    /// ```
+    #[inline(always)]
+    pub fn new<S: Set, T: Set>(source: &S, target: &T) -> Self {
         Self {
             domain_size: source.size(),
             target_size: target.size(),
