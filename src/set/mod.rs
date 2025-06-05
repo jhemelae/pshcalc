@@ -110,9 +110,9 @@ impl AtomHandle {
 // Tuple handle
 #[derive(Clone, Debug, PartialEq)]
 pub struct TupleHandle {
-    indices_start: usize,
-    sizes_start: usize,
-    len: usize,
+    pub(crate) indices_start: usize,
+    pub(crate) sizes_start: usize,
+    pub(crate) len: usize,
 }
 
 impl Element for TupleHandle {}
@@ -133,21 +133,6 @@ impl TupleHandle {
         }
     }
 
-    #[inline(always)]
-    pub fn get_indices<'a>(&self, world: &'a World) -> &'a [usize] {
-        world.get_indices(self.indices_start, self.len)
-    }
-
-    #[inline(always)]
-    pub fn get_indices_mut<'a>(&self, world: &'a mut World) -> &'a mut [usize] {
-        world.get_indices_mut(self.indices_start, self.len)
-    }
-
-    #[inline(always)]
-    pub fn get_sizes<'a>(&self, world: &'a World) -> &'a [usize] {
-        world.get_sizes(self.sizes_start, self.len)
-    }
-
     pub fn len(&self) -> usize {
         self.len
     }
@@ -156,8 +141,8 @@ impl TupleHandle {
 impl LinearIndexable for TupleHandle {
     #[inline(always)]
     fn to_linear_index(&self, world: &World) -> usize {
-        let indices = self.get_indices(world);
-        let sizes = self.get_sizes(world);
+        let indices = world.get_indices(self.indices_start, self.len);
+        let sizes = world.get_sizes(self.sizes_start, self.len);
         calculate_linear_index(indices, sizes)
     }
 }
@@ -165,9 +150,9 @@ impl LinearIndexable for TupleHandle {
 // Function handle
 #[derive(Clone, Debug, PartialEq)]
 pub struct FunctionHandle {
-    indices_start: usize,
-    sizes_start: usize,
-    len: usize,
+    pub(crate) indices_start: usize,
+    pub(crate) sizes_start: usize,
+    pub(crate) len: usize,
     target_size: usize, // Keep for convenience, but sizes array is the source of truth
 }
 
@@ -193,21 +178,6 @@ impl FunctionHandle {
             len,
             target_size,
         }
-    }
-
-    #[inline(always)]
-    pub fn get_indices<'a>(&self, world: &'a World) -> &'a [usize] {
-        world.get_indices(self.indices_start, self.len)
-    }
-
-    #[inline(always)]
-    pub fn get_indices_mut<'a>(&self, world: &'a mut World) -> &'a mut [usize] {
-        world.get_indices_mut(self.indices_start, self.len)
-    }
-
-    #[inline(always)]
-    pub fn get_sizes<'a>(&self, world: &'a World) -> &'a [usize] {
-        world.get_sizes(self.sizes_start, self.len)
     }
 
     pub fn len(&self) -> usize {
@@ -238,8 +208,8 @@ impl FunctionHandle {
 impl LinearIndexable for FunctionHandle {
     #[inline(always)]
     fn to_linear_index(&self, world: &World) -> usize {
-        let indices = self.get_indices(world);
-        let sizes = self.get_sizes(world);
+        let indices = world.get_indices(self.indices_start, self.len);
+        let sizes = world.get_sizes(self.sizes_start, self.len);
         calculate_linear_index(indices, sizes)
     }
 }
@@ -441,7 +411,9 @@ impl Variable<TupleHandle> for ProductSetVariable {
     #[inline(always)]
     fn initialize(&mut self, world: &mut World) {
         self.done = false;
-        self.current.get_indices_mut(world).fill(0);
+        world
+            .get_indices_mut(self.current.indices_start, self.current.len)
+            .fill(0);
     }
 
     #[inline(always)]
@@ -450,7 +422,8 @@ impl Variable<TupleHandle> for ProductSetVariable {
             return;
         }
 
-        let indices = self.current.get_indices_mut(world);
+        let indices =
+            world.get_indices_mut(self.current.indices_start, self.current.len);
         self.done = advance_counter(indices, &self.sizes);
     }
 
@@ -513,7 +486,9 @@ impl Variable<FunctionHandle> for HomSetVariable {
     #[inline(always)]
     fn initialize(&mut self, world: &mut World) {
         self.done = false;
-        self.current.get_indices_mut(world).fill(0);
+        world
+            .get_indices_mut(self.current.indices_start, self.current.len)
+            .fill(0);
     }
 
     #[inline(always)]
@@ -522,7 +497,8 @@ impl Variable<FunctionHandle> for HomSetVariable {
             return;
         }
 
-        let indices = self.current.get_indices_mut(world);
+        let indices =
+            world.get_indices_mut(self.current.indices_start, self.current.len);
         self.done = advance_counter(indices, &self.sizes);
     }
 
