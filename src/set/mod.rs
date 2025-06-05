@@ -69,52 +69,11 @@ impl World {
 // Element trait for type safety
 pub trait Element: PartialEq + Clone + std::fmt::Debug {}
 
-// LinearIndexable trait provides a common interface for types that work with linear indices
-// All operations take a World parameter for consistency, even if some types don't use it
+// LinearIndexable trait provides a common interface for converting multi-dimensional indices to linear indices
+// This is the core operation needed for efficient function application and array indexing
 pub trait LinearIndexable {
-    /// Get the indices as a slice
-    fn get_indices<'a>(&self, world: &'a World) -> &'a [usize];
-
-    /// Get mutable access to indices (not supported by all types)
-    fn get_indices_mut<'a>(&self, world: &'a mut World) -> &'a mut [usize];
-
-    /// Get the sizes/dimensions
-    fn get_sizes<'a>(&self, world: &'a World) -> &'a [usize];
-
-    /// Get the length/dimensionality
-    fn len(&self) -> usize;
-
     /// Calculate linear index from multi-dimensional indices
-    #[inline(always)]
-    fn to_linear_index(&self, world: &World) -> usize {
-        let indices = self.get_indices(world);
-        let sizes = self.get_sizes(world);
-
-        if indices.len() == 2 {
-            // Optimized path for binary case
-            indices[0] + indices[1] * sizes[0]
-        } else {
-            let mut index = 0;
-            let mut multiplier = 1;
-            for i in 0..indices.len() {
-                index += indices[i] * multiplier;
-                multiplier *= sizes[i];
-            }
-            index
-        }
-    }
-
-    /// Set index at a specific position
-    #[inline(always)]
-    fn set_index(&self, world: &mut World, position: usize, value: usize) {
-        self.get_indices_mut(world)[position] = value;
-    }
-
-    /// Get index at a specific position
-    #[inline(always)]
-    fn get_index(&self, world: &World, position: usize) -> usize {
-        self.get_indices(world)[position]
-    }
+    fn to_linear_index(&self, world: &World) -> usize;
 }
 
 // Atom handle
@@ -173,27 +132,33 @@ impl TupleHandle {
             len,
         }
     }
-}
 
-impl LinearIndexable for TupleHandle {
     #[inline(always)]
-    fn get_indices<'a>(&self, world: &'a World) -> &'a [usize] {
+    pub fn get_indices<'a>(&self, world: &'a World) -> &'a [usize] {
         world.get_indices(self.indices_start, self.len)
     }
 
     #[inline(always)]
-    fn get_indices_mut<'a>(&self, world: &'a mut World) -> &'a mut [usize] {
+    pub fn get_indices_mut<'a>(&self, world: &'a mut World) -> &'a mut [usize] {
         world.get_indices_mut(self.indices_start, self.len)
     }
 
     #[inline(always)]
-    fn get_sizes<'a>(&self, world: &'a World) -> &'a [usize] {
+    pub fn get_sizes<'a>(&self, world: &'a World) -> &'a [usize] {
         world.get_sizes(self.sizes_start, self.len)
     }
 
-    #[inline(always)]
-    fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.len
+    }
+}
+
+impl LinearIndexable for TupleHandle {
+    #[inline(always)]
+    fn to_linear_index(&self, world: &World) -> usize {
+        let indices = self.get_indices(world);
+        let sizes = self.get_sizes(world);
+        calculate_linear_index(indices, sizes)
     }
 }
 
@@ -201,8 +166,9 @@ impl LinearIndexable for TupleHandle {
 #[derive(Clone, Debug, PartialEq)]
 pub struct FunctionHandle {
     indices_start: usize,
-    domain_size: usize,
-    target_size: usize,
+    sizes_start: usize,
+    len: usize,
+    target_size: usize, // Keep for convenience, but sizes array is the source of truth
 }
 
 impl Element for FunctionHandle {}
@@ -213,13 +179,39 @@ impl FunctionHandle {
         domain_size: usize,
         target_size: usize,
     ) -> Self {
-        let indices_start = world.alloc_indices(domain_size);
-        world.get_indices_mut(indices_start, domain_size).fill(0);
+        let len = domain_size;
+        let indices_start = world.alloc_indices(len);
+        let sizes_start = world.alloc_sizes(len);
+
+        // Initialize indices to 0 and sizes to target_size for each dimension
+        world.get_indices_mut(indices_start, len).fill(0);
+        world.get_sizes_mut(sizes_start, len).fill(target_size);
+
         Self {
             indices_start,
-            domain_size,
+            sizes_start,
+            len,
             target_size,
         }
+    }
+
+    #[inline(always)]
+    pub fn get_indices<'a>(&self, world: &'a World) -> &'a [usize] {
+        world.get_indices(self.indices_start, self.len)
+    }
+
+    #[inline(always)]
+    pub fn get_indices_mut<'a>(&self, world: &'a mut World) -> &'a mut [usize] {
+        world.get_indices_mut(self.indices_start, self.len)
+    }
+
+    #[inline(always)]
+    pub fn get_sizes<'a>(&self, world: &'a World) -> &'a [usize] {
+        world.get_sizes(self.sizes_start, self.len)
+    }
+
+    pub fn len(&self) -> usize {
+        self.len
     }
 
     #[inline(always)]
@@ -228,7 +220,7 @@ impl FunctionHandle {
     }
 
     pub fn domain_size(&self) -> usize {
-        self.domain_size
+        self.len
     }
 
     pub fn target_size(&self) -> usize {
@@ -245,25 +237,10 @@ impl FunctionHandle {
 
 impl LinearIndexable for FunctionHandle {
     #[inline(always)]
-    fn get_indices<'a>(&self, world: &'a World) -> &'a [usize] {
-        world.get_indices(self.indices_start, self.domain_size)
-    }
-
-    #[inline(always)]
-    fn get_indices_mut<'a>(&self, world: &'a mut World) -> &'a mut [usize] {
-        world.get_indices_mut(self.indices_start, self.domain_size)
-    }
-
-    #[inline(always)]
-    fn get_sizes<'a>(&self, _world: &'a World) -> &'a [usize] {
-        // FunctionHandle doesn't have explicit sizes stored, but we could create a temporary
-        // For now, this is a limitation - we'll need the stack tuple approach for functions
-        &[]
-    }
-
-    #[inline(always)]
-    fn len(&self) -> usize {
-        self.domain_size
+    fn to_linear_index(&self, world: &World) -> usize {
+        let indices = self.get_indices(world);
+        let sizes = self.get_sizes(world);
+        calculate_linear_index(indices, sizes)
     }
 }
 
@@ -299,32 +276,6 @@ impl<const N: usize> StackTuple<N> {
 }
 
 impl<const N: usize> LinearIndexable for StackTuple<N> {
-    #[inline(always)]
-    fn get_indices<'a>(&self, _world: &'a World) -> &'a [usize] {
-        // For stack tuples, we need to work around the lifetime issue
-        // The easiest approach is to extend the slice lifetime to match the world lifetime
-        // This is safe because we know the stack tuple lives at least as long as this call
-        unsafe { std::slice::from_raw_parts(self.indices.as_ptr(), N) }
-    }
-
-    #[inline(always)]
-    fn get_indices_mut<'a>(&self, _world: &'a mut World) -> &'a mut [usize] {
-        // StackTuple mutation should be done through direct methods like set_index()
-        // since we can't get a mutable reference from an immutable self
-        unreachable!("Use StackTuple::set_index() for mutation - get_indices_mut not supported")
-    }
-
-    #[inline(always)]
-    fn get_sizes<'a>(&self, _world: &'a World) -> &'a [usize] {
-        // For stack tuples, we need to work around the lifetime issue
-        unsafe { std::slice::from_raw_parts(self.sizes.as_ptr(), N) }
-    }
-
-    #[inline(always)]
-    fn len(&self) -> usize {
-        N
-    }
-
     #[inline(always)]
     fn to_linear_index(&self, _world: &World) -> usize {
         // Optimized implementation that ignores world parameter
@@ -540,7 +491,7 @@ impl HomSet {
 pub struct HomSetVariable {
     done: bool,
     current: FunctionHandle,
-    limits: Vec<usize>,
+    sizes: Vec<usize>,
 }
 
 impl HomSetVariable {
@@ -549,11 +500,11 @@ impl HomSetVariable {
         domain_size: usize,
         target_size: usize,
     ) -> Self {
-        let limits = vec![target_size; domain_size];
+        let sizes = vec![target_size; domain_size];
         Self {
             done: false,
             current: FunctionHandle::new(world, domain_size, target_size),
-            limits,
+            sizes,
         }
     }
 }
@@ -572,7 +523,7 @@ impl Variable<FunctionHandle> for HomSetVariable {
         }
 
         let indices = self.current.get_indices_mut(world);
-        self.done = advance_counter(indices, &self.limits);
+        self.done = advance_counter(indices, &self.sizes);
     }
 
     #[inline(always)]
@@ -582,6 +533,23 @@ impl Variable<FunctionHandle> for HomSetVariable {
         } else {
             Some(&self.current)
         }
+    }
+}
+
+// Shared linear indexing implementation for multi-dimensional handles
+#[inline(always)]
+fn calculate_linear_index(indices: &[usize], sizes: &[usize]) -> usize {
+    if indices.len() == 2 {
+        // Optimized path for binary case
+        indices[0] + indices[1] * sizes[0]
+    } else {
+        let mut index = 0;
+        let mut multiplier = 1;
+        for i in 0..indices.len() {
+            index += indices[i] * multiplier;
+            multiplier *= sizes[i];
+        }
+        index
     }
 }
 

@@ -21,7 +21,6 @@ fn main() {
     let mut count = 0;
     while let Some(f) = function.get() {
         if checker.is_associative(&world, f) {
-            // if ultra_checker.is_associative(&world, f) {
             count += 1;
         }
         function.advance(&mut world);
