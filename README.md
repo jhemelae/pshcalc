@@ -1,6 +1,6 @@
 # pshcalc
 
-A Rust library for set theory computations, with planned support for category theory. Currently a work in progress.
+A Rust library for computations with finite sets, with planned support for category theory and presheaf calculations. Currently a work in progress.
 
 ## Overview
 
