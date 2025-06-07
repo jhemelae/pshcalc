@@ -131,6 +131,12 @@ pub struct World {
     next_size_slot: usize,
 }
 
+impl Default for World {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl World {
     /// Creates a new empty World with no allocated data.
     ///
@@ -345,7 +351,7 @@ pub struct AtomHandle {
 impl Element for AtomHandle {}
 
 impl AtomHandle {
-    /// Creates a new AtomHandle.
+    /// Creates a new `AtomHandle`.
     ///
     /// # Arguments
     ///
@@ -354,7 +360,7 @@ impl AtomHandle {
     ///
     /// # Returns
     ///
-    /// New AtomHandle with index initialized to 0
+    /// New `AtomHandle` with index initialized to 0
     pub fn new(world: &mut World, _size: usize) -> Self {
         let index_position = world.alloc_indices(1);
         world.set_index(index_position, 0);
@@ -391,7 +397,7 @@ impl AtomHandle {
 impl LinearIndexable for AtomHandle {
     /// For atoms, the linear index is simply the atom's current index value.
     ///
-    /// This allows AtomHandle to be used directly with function application
+    /// This allows `AtomHandle` to be used directly with function application
     /// via the `apply` method, treating the atom as a 1-dimensional input.
     ///
     /// # Returns
@@ -417,7 +423,7 @@ pub struct TupleHandle {
 impl Element for TupleHandle {}
 
 impl TupleHandle {
-    /// Creates a new TupleHandle with the specified dimension sizes.
+    /// Creates a new `TupleHandle` with the specified dimension sizes.
     ///
     /// Allocates space in both the indices and sizes arrays of the World.
     /// All indices are initialized to 0, and the sizes are copied from
@@ -430,7 +436,7 @@ impl TupleHandle {
     ///
     /// # Returns
     ///
-    /// New TupleHandle with all indices initialized to 0
+    /// New `TupleHandle` with all indices initialized to 0
     ///
     /// # Example
     ///
@@ -462,6 +468,11 @@ impl TupleHandle {
     /// Number of dimensions (length of the tuple)
     pub fn len(&self) -> usize {
         self.len
+    }
+
+    /// Returns true if the tuple has no dimensions
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
     }
 }
 
@@ -497,7 +508,7 @@ pub struct FunctionHandle {
 impl Element for FunctionHandle {}
 
 impl FunctionHandle {
-    /// Creates a new FunctionHandle representing a function f: A → B.
+    /// Creates a new `FunctionHandle` representing a function f: A → B.
     ///
     /// Allocates space for `domain_size` function values and initializes
     /// all values to 0. Also stores the dimension sizes (all equal to
@@ -511,7 +522,7 @@ impl FunctionHandle {
     ///
     /// # Returns
     ///
-    /// New FunctionHandle with all values initialized to 0
+    /// New `FunctionHandle` with all values initialized to 0
     ///
     /// # Example
     ///
@@ -554,6 +565,11 @@ impl FunctionHandle {
         self.len
     }
 
+    /// Returns true if the function has an empty domain
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
     /// Gets the function value at a specific linear position.
     ///
     /// This is a low-level method for direct access to function values.
@@ -562,7 +578,7 @@ impl FunctionHandle {
     /// # Arguments
     ///
     /// * `world` - Reference to World containing the data
-    /// * `position` - Linear position in the domain (0 <= position < domain_size)
+    /// * `position` - Linear position in the domain (0 <= position < `domain_size`)
     ///
     /// # Returns
     ///
@@ -581,12 +597,12 @@ impl FunctionHandle {
     /// # Arguments
     ///
     /// * `world` - Mutable reference to World containing the data
-    /// * `position` - Linear position in the domain (0 <= position < domain_size)
-    /// * `value` - New function value (should be < target_size)
+    /// * `position` - Linear position in the domain (0 <= position < `domain_size`)
+    /// * `value` - New function value (should be < `target_size`)
     ///
     /// # Panics
     ///
-    /// Does not validate that position < domain_size or value < target_size.
+    /// Does not validate that position < `domain_size` or value < `target_size`.
     /// Callers should ensure validity.
     #[inline(always)]
     pub fn set_value(&self, world: &mut World, position: usize, value: usize) {
@@ -704,7 +720,7 @@ pub struct StackTuple<const N: usize> {
 }
 
 impl<const N: usize> StackTuple<N> {
-    /// Creates a new StackTuple with the specified dimension sizes.
+    /// Creates a new `StackTuple` with the specified dimension sizes.
     ///
     /// All indices are initialized to 0.
     ///
@@ -714,7 +730,7 @@ impl<const N: usize> StackTuple<N> {
     ///
     /// # Returns
     ///
-    /// New StackTuple with all indices set to 0
+    /// New `StackTuple` with all indices set to 0
     pub fn new(sizes: [usize; N]) -> Self {
         Self {
             indices: [0; N],
@@ -830,7 +846,7 @@ pub struct StackAtom {
 }
 
 impl StackAtom {
-    /// Creates a new StackAtom with the specified index and size.
+    /// Creates a new `StackAtom` with the specified index and size.
     ///
     /// # Arguments
     ///
@@ -839,7 +855,7 @@ impl StackAtom {
     ///
     /// # Returns
     ///
-    /// New StackAtom with the given index and size
+    /// New `StackAtom` with the given index and size
     #[inline(always)]
     pub fn new(index: usize, size: usize) -> Self {
         Self { index, size }
@@ -876,7 +892,7 @@ impl LinearIndexable for StackAtom {
 
 // LinearIndexable implementation for arrays of StackAtom
 impl<const N: usize> LinearIndexable for [StackAtom; N] {
-    /// Calculate linear index for arrays of StackAtoms using row-major order.
+    /// Calculate linear index for arrays of `StackAtoms` using row-major order.
     ///
     /// For an array [a₀, a₁, ..., aₙ₋₁] where each atom has the same size,
     /// the linear index is: a₀ + a₁×size + a₂×size² + ... + aₙ₋₁×sizeⁿ⁻¹
@@ -890,7 +906,7 @@ impl<const N: usize> LinearIndexable for [StackAtom; N] {
         let mut result = 0;
         let mut multiplier = 1;
 
-        for atom in self.iter() {
+        for atom in self {
             result += atom.index * multiplier;
             multiplier *= size;
         }
@@ -911,7 +927,7 @@ impl BinaryTuple {
     ///
     /// # Returns
     ///
-    /// New BinaryTuple initialized to (0, 0)
+    /// New `BinaryTuple` initialized to (0, 0)
     ///
     /// # Example
     ///
@@ -1030,7 +1046,7 @@ pub trait Variable<T: Element> {
 ///
 /// This trait provides a uniform interface for different types of sets,
 /// enabling them to be used interchangeably in contexts like function
-/// definitions (HomSets) and other mathematical constructions.
+/// definitions (`HomSets`) and other mathematical constructions.
 ///
 /// # Implementors
 ///
@@ -1083,7 +1099,7 @@ pub struct AtomSet {
 }
 
 impl AtomSet {
-    /// Creates a new AtomSet with the specified number of elements.
+    /// Creates a new `AtomSet` with the specified number of elements.
     ///
     /// # Arguments
     ///
@@ -1091,7 +1107,7 @@ impl AtomSet {
     ///
     /// # Returns
     ///
-    /// New AtomSet representing {0, 1, 2, ..., size-1}
+    /// New `AtomSet` representing {0, 1, 2, ..., size-1}
     pub fn new(size: usize) -> Self {
         Self { size }
     }
@@ -1158,6 +1174,12 @@ impl Iterator for AtomSetIterator {
 impl ExactSizeIterator for AtomSetIterator {
     fn len(&self) -> usize {
         self.size - self.current
+    }
+}
+
+impl AtomSet {
+    pub fn iter(&self) -> AtomSetIterator {
+        <&Self as IntoIterator>::into_iter(self)
     }
 }
 
@@ -1249,7 +1271,7 @@ pub struct ProductSet {
 
 impl ProductSet {
     pub fn new(atom_sets: &[AtomSet]) -> Self {
-        let sizes = atom_sets.iter().map(|set| set.size()).collect();
+        let sizes = atom_sets.iter().map(AtomSet::size).collect();
         Self { sizes }
     }
 
@@ -1327,7 +1349,7 @@ pub struct HomSet {
 }
 
 impl HomSet {
-    /// Creates a new HomSet representing functions from any set type to any set type.
+    /// Creates a new `HomSet` representing functions from any set type to any set type.
     ///
     /// This method accepts any types implementing the [`Set`] trait, making it
     /// flexible for different kinds of domains and codomains. In category theory,
@@ -1340,7 +1362,8 @@ impl HomSet {
     ///
     /// # Returns
     ///
-    /// New HomSet with size target_size^domain_size
+    /// New `HomSet` with size `target_size^domain_size`
+    ///
     ///
     /// # Examples
     ///
@@ -1361,8 +1384,18 @@ impl HomSet {
         }
     }
 
+    /// Returns the size of the hom-set, which is `target_size^domain_size`.
+    /// This represents the number of possible functions from the domain to the codomain.
+    /// # Returns
+    ///
+    /// Size of the hom-set (number of functions)
+    ///
+    /// # Panics
+    ///
+    /// Panics if `domain_size` is too large to compute `target_size.pow(domain_size)` without overflow.
     pub fn size(&self) -> usize {
-        self.target_size.pow(self.domain_size as u32)
+        self.target_size
+            .pow(u32::try_from(self.domain_size).unwrap())
     }
 
     pub fn create_variable(&self, world: &mut World) -> HomSetVariable {
