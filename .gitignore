@@ -9,3 +9,6 @@
 
 # cargo
 .cargo/config.toml
+
+# github
+.github

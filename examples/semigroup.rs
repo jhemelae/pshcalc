@@ -1,33 +1,49 @@
+use pshcalc::set::{AtomSet, HomSet, ProductSet, Variable, World};
 use std::time::Instant;
 
-#[inline(always)]
-fn next(x: &mut [usize], n: usize) {
-    for i in 0..x.len() {
-        // Unsafe block to avoid bounds checks within the loop
-        unsafe {
-            let elem = x.get_unchecked_mut(i);
-            *elem += 1;
-            if *elem == n {
-                *elem = 0;
-            } else {
-                break;
-            }
+fn main() {
+    let start = Instant::now();
+    let mut world = World::new();
+    let n = 4;
+
+    let a = AtomSet::new(n);
+    let a_x_a = ProductSet::new(&[a.clone(), a.clone()]);
+    let multiplications = HomSet::new(&a_x_a, &a);
+
+    let mut function = multiplications.create_variable(&mut world);
+    function.initialize(&mut world);
+
+    let mut count = 0;
+    while let Some(f) = function.get() {
+        if is_associative(&world, f, &a) {
+            count += 1;
         }
+        function.advance(&mut world);
     }
+
+    println!("Count = {:?}", count);
+    let duration = start.elapsed();
+    println!("Time elapsed is: {:?}", duration);
 }
 
-#[inline(always)]
-fn get(s: &[usize], n: usize, i: usize, j: usize) -> usize {
-        s[n * i + j]
-}
+/// Check if a function is associative using direct StackAtom arrays.
+/// A function f: A×A → A is associative if f(f(i,j),k) = f(i,f(j,k)) for all i,j,k ∈ A
+fn is_associative(
+    world: &World,
+    f: &pshcalc::set::FunctionHandle,
+    a: &AtomSet,
+) -> bool {
+    for i in a {
+        for j in a {
+            for k in a {
+                // Calculate f(f(i,j), k)
+                let f_ij = f.apply(world, &[i.clone(), j.clone()]);
+                let left = f.apply(world, &[f_ij, k.clone()]);
 
-#[inline(always)]
-fn is_associative(s: &[usize], n: usize) -> bool {
-    for i in 0..n {
-        for j in 0..n {
-            for k in 0..n {
-                let left = get(s, n, get(s, n, i, j), k);
-                let right = get(s, n, i, get(s, n, j, k));
+                // Calculate f(i, f(j,k))
+                let f_jk = f.apply(world, &[j.clone(), k.clone()]);
+                let right = f.apply(world, &[i.clone(), f_jk]);
+
                 if left != right {
                     return false;
                 }
@@ -35,24 +51,4 @@ fn is_associative(s: &[usize], n: usize) -> bool {
         }
     }
     true
-}
-
-fn main() {
-    let start = Instant::now();
-    let n: usize = 4;
-    let size = n * n;
-    
-    let mut array = vec![0; size];
-
-    let mut count = 0;
-    for _i in 0..n.pow(size as u32) {
-        if is_associative(&array, n) {
-            count += 1;
-        }
-        next(&mut array, n);
-    }
-    println!("Count = {:?}", count);
-
-    let duration = start.elapsed();
-    println!("Time elapsed is: {:?}", duration);
 }
