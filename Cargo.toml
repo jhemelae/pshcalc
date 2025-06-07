@@ -2,7 +2,3 @@
 name = "pshcalc"
 version = "0.1.0"
 edition = "2021"
-
-[dependencies]
-streaming-iterator = "0.1.9"
-smallvec = "1.0"

@@ -83,17 +83,7 @@
 //! let result = f.apply(&world, &input);
 //! ```
 //!
-//! ## Associativity Testing
-//!
-//! ```
-//! use pshcalc::set::{World, FunctionHandle, AssociativityChecker};
-//!
-//! let mut world = World::new();
-//! let f = FunctionHandle::new(&mut world, 4, 2);
-//! let mut checker = AssociativityChecker::new(&mut world, 2);
-//!
-//! let is_associative = checker.is_associative(&world, &f);
-//! ```
+
 //!
 //! # Mathematical Background
 //!
@@ -345,58 +335,34 @@ pub trait LinearIndexable {
     fn to_linear_index(&self, world: &World) -> usize;
 }
 
-// Atom handle
-/// Handle representing atomic elements in the mathematical system.
-///
-/// An `AtomHandle` represents a single atomic element with a fixed size.
-/// It stores its current index value in the World's indices array and
-/// maintains its own size for validation purposes.
-///
-/// # Memory Layout
-///
-/// AtomHandles are lightweight, storing only:
-/// - `index_pos`: Position in World's indices array (8 bytes)
-/// - `size`: Maximum valid index value (8 bytes)
-///
-/// # Example
-///
-/// ```
-/// # use pshcalc::set::{World, AtomHandle};
-/// let mut world = World::new();
-/// let atom = AtomHandle::new(&mut world, 5);
-/// assert_eq!(atom.get_index(&world), 0);
-/// atom.set_index(&mut world, 3);
-/// assert_eq!(atom.get_index(&world), 3);
-/// ```
+// Atom handle - represents a single atomic element in a set
 #[derive(Clone, Debug, PartialEq)]
 pub struct AtomHandle {
-    index_pos: usize,
-    size: usize,
+    /// Index position in World's indices array where this atom's current value is stored
+    pub(crate) index_position: usize,
 }
 
 impl Element for AtomHandle {}
 
 impl AtomHandle {
-    /// Creates a new AtomHandle with the specified size.
-    ///
-    /// Allocates space in the World's indices array and initializes
-    /// the index to 0.
+    /// Creates a new AtomHandle.
     ///
     /// # Arguments
     ///
     /// * `world` - Mutable reference to World for allocation
-    /// * `size` - Maximum valid index value (exclusive upper bound)
+    /// * `_size` - Size of the set this atom belongs to (for validation)
     ///
     /// # Returns
     ///
-    /// New AtomHandle initialized to index 0
-    pub fn new(world: &mut World, size: usize) -> Self {
-        let index_pos = world.alloc_indices(1);
-        world.set_index(index_pos, 0);
-        Self { index_pos, size }
+    /// New AtomHandle with index initialized to 0
+    pub fn new(world: &mut World, _size: usize) -> Self {
+        let index_position = world.alloc_indices(1);
+        world.set_index(index_position, 0);
+
+        Self { index_position }
     }
 
-    /// Gets the current index value for this atom.
+    /// Gets the current index value of this atom.
     ///
     /// # Arguments
     ///
@@ -404,34 +370,36 @@ impl AtomHandle {
     ///
     /// # Returns
     ///
-    /// Current index value (0 <= value < size)
+    /// Current index value
     #[inline(always)]
     pub fn get_index(&self, world: &World) -> usize {
-        world.get_index(self.index_pos)
+        world.get_index(self.index_position)
     }
 
-    /// Sets the current index value for this atom.
+    /// Sets the current index value of this atom.
     ///
     /// # Arguments
     ///
     /// * `world` - Mutable reference to World containing the data
-    /// * `value` - New index value (should be < size)
-    ///
-    /// # Panics
-    ///
-    /// Does not validate that value < size. Callers should ensure validity.
+    /// * `index` - New index value
     #[inline(always)]
-    pub fn set_index(&self, world: &mut World, value: usize) {
-        world.set_index(self.index_pos, value);
+    pub fn set_index(&self, world: &mut World, index: usize) {
+        world.set_index(self.index_position, index);
     }
+}
 
-    /// Returns the size (maximum valid index + 1) for this atom.
+impl LinearIndexable for AtomHandle {
+    /// For atoms, the linear index is simply the atom's current index value.
+    ///
+    /// This allows AtomHandle to be used directly with function application
+    /// via the `apply` method, treating the atom as a 1-dimensional input.
     ///
     /// # Returns
     ///
-    /// Size of this atom's domain
-    pub fn size(&self) -> usize {
-        self.size
+    /// The current index value of this atom
+    #[inline(always)]
+    fn to_linear_index(&self, world: &World) -> usize {
+        self.get_index(world)
     }
 }
 
@@ -674,9 +642,14 @@ impl FunctionHandle {
     /// let result = f.apply(&world, &input);
     /// ```
     #[inline(always)]
-    pub fn apply<T: LinearIndexable>(&self, world: &World, tuple: &T) -> usize {
+    pub fn apply<T: LinearIndexable>(
+        &self,
+        world: &World,
+        tuple: &T,
+    ) -> StackAtom {
         let linear_index = tuple.to_linear_index(world);
-        world.get_index(self.indices_start + linear_index)
+        let result_index = world.get_index(self.indices_start + linear_index);
+        StackAtom::new(result_index, self.target_size)
     }
 }
 
@@ -827,6 +800,104 @@ impl<const N: usize> LinearIndexable for StackTuple<N> {
 /// assert_eq!(linear, 2 + 3 * 5); // = 17
 /// ```
 pub type BinaryTuple = StackTuple<2>;
+
+/// Stack-allocated atom for zero-allocation performance.
+///
+/// `StackAtom` is a lightweight wrapper around an index and size that implements
+/// `LinearIndexable` for efficient function application without any World allocation.
+/// It stores both the element's index within its set and the size of that set for
+/// proper array indexing when used in multi-dimensional contexts.
+///
+/// # Performance Benefits
+///
+/// - **Zero allocation**: No heap allocation or World interaction needed
+/// - **Direct indexing**: Simply returns the contained index value
+/// - **Minimal overhead**: Effectively zero-cost abstraction
+/// - **Type safety**: Carries size information for validation and array operations
+///
+/// # Example
+///
+/// ```
+/// # use pshcalc::set::{StackAtom, LinearIndexable, World};
+/// let world = World::new();
+/// let atom = StackAtom::new(42, 100);
+/// assert_eq!(atom.to_linear_index(&world), 42);
+/// ```
+#[derive(Clone, Debug, PartialEq)]
+pub struct StackAtom {
+    index: usize,
+    size: usize,
+}
+
+impl StackAtom {
+    /// Creates a new StackAtom with the specified index and size.
+    ///
+    /// # Arguments
+    ///
+    /// * `index` - The index value for this atom
+    /// * `size` - The size of the set this atom belongs to
+    ///
+    /// # Returns
+    ///
+    /// New StackAtom with the given index and size
+    #[inline(always)]
+    pub fn new(index: usize, size: usize) -> Self {
+        Self { index, size }
+    }
+
+    /// Gets the index value of this atom.
+    ///
+    /// # Returns
+    ///
+    /// The current index value
+    #[inline(always)]
+    pub fn get_index(&self) -> usize {
+        self.index
+    }
+
+    /// Sets the index value of this atom.
+    ///
+    /// # Arguments
+    ///
+    /// * `index` - New index value
+    #[inline(always)]
+    pub fn set_index(&mut self, index: usize) {
+        self.index = index;
+    }
+}
+
+impl LinearIndexable for StackAtom {
+    /// For atoms, the linear index is simply the contained index value.
+    #[inline(always)]
+    fn to_linear_index(&self, _world: &World) -> usize {
+        self.index
+    }
+}
+
+// LinearIndexable implementation for arrays of StackAtom
+impl<const N: usize> LinearIndexable for [StackAtom; N] {
+    /// Calculate linear index for arrays of StackAtoms using row-major order.
+    ///
+    /// For an array [a₀, a₁, ..., aₙ₋₁] where each atom has the same size,
+    /// the linear index is: a₀ + a₁×size + a₂×size² + ... + aₙ₋₁×sizeⁿ⁻¹
+    #[inline(always)]
+    fn to_linear_index(&self, _world: &World) -> usize {
+        if self.is_empty() {
+            return 0;
+        }
+
+        let size = self[0].size;
+        let mut result = 0;
+        let mut multiplier = 1;
+
+        for atom in self.iter() {
+            result += atom.index * multiplier;
+            multiplier *= size;
+        }
+
+        result
+    }
+}
 
 impl BinaryTuple {
     /// Creates a new binary tuple with equal dimensions.
@@ -1052,6 +1123,53 @@ impl Set for AtomSet {
     #[inline(always)]
     fn size(&self) -> usize {
         self.size
+    }
+}
+
+/// Iterator over atoms in an [`AtomSet`].
+///
+/// This iterator yields [`StackAtom`] instances for each element in the set,
+/// allowing zero-allocation iteration while maintaining compatibility with
+/// the [`LinearIndexable`] trait for function application.
+pub struct AtomSetIterator {
+    current: usize,
+    size: usize,
+}
+
+impl Iterator for AtomSetIterator {
+    type Item = StackAtom;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.current < self.size {
+            let atom = StackAtom::new(self.current, self.size);
+            self.current += 1;
+            Some(atom)
+        } else {
+            None
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = self.size - self.current;
+        (remaining, Some(remaining))
+    }
+}
+
+impl ExactSizeIterator for AtomSetIterator {
+    fn len(&self) -> usize {
+        self.size - self.current
+    }
+}
+
+impl IntoIterator for &AtomSet {
+    type Item = StackAtom;
+    type IntoIter = AtomSetIterator;
+
+    fn into_iter(self) -> Self::IntoIter {
+        AtomSetIterator {
+            current: 0,
+            size: self.size,
+        }
     }
 }
 
@@ -1349,144 +1467,5 @@ fn calculate_linear_index(indices: &[usize], sizes: &[usize]) -> usize {
             multiplier *= sizes[i];
         }
         index
-    }
-}
-
-// Zero-allocation AssociativityChecker using stack tuples
-/// Zero-allocation associativity checker for binary operations.
-///
-/// `AssociativityChecker` efficiently tests whether a binary operation is associative
-/// using stack-allocated tuples to avoid heap allocations during the checking process.
-///
-/// # Mathematical Background
-///
-/// A binary operation f: A × A → A is associative if for all a, b, c ∈ A:
-/// ```text
-/// f(f(a, b), c) = f(a, f(b, c))
-/// ```
-///
-/// # Performance Features
-///
-/// - **Zero allocation**: Uses [`BinaryTuple`] for stack allocation
-/// - **Cache friendly**: Reuses tuple instances across iterations  
-/// - **Optimized indexing**: Leverages fast binary tuple indexing
-/// - **Early termination**: Returns `false` immediately on first violation
-///
-/// # Algorithm Complexity
-///
-/// - **Time**: O(n³) where n is the size of the set
-/// - **Space**: O(1) - constant stack allocation
-/// - **Cache**: Excellent locality due to tuple reuse
-///
-/// # Example
-///
-/// ```
-/// # use pshcalc::set::{World, FunctionHandle, AssociativityChecker};
-/// let mut world = World::new();
-/// let mut f = FunctionHandle::new(&mut world, 4, 2); // f: {0,1}² → {0,1}
-///
-/// // Set up some function values (e.g., AND operation)
-/// // f(0,0)=0, f(0,1)=0, f(1,0)=0, f(1,1)=1
-/// f.set_value(&mut world, 0, 0); // f(0,0) = 0
-/// f.set_value(&mut world, 1, 0); // f(0,1) = 0  
-/// f.set_value(&mut world, 2, 0); // f(1,0) = 0
-/// f.set_value(&mut world, 3, 1); // f(1,1) = 1
-///
-/// let mut checker = AssociativityChecker::new(&mut world, 2);
-/// let is_assoc = checker.is_associative(&world, &f);
-/// assert_eq!(is_assoc, true); // AND is associative
-/// ```
-pub struct AssociativityChecker {
-    tuple_ij: BinaryTuple,
-    tuple_jk: BinaryTuple,
-    tuple_fij_k: BinaryTuple,
-    tuple_i_fjk: BinaryTuple,
-    n: usize,
-}
-
-impl AssociativityChecker {
-    /// Creates a new associativity checker for the given set size.
-    ///
-    /// Initializes four [`BinaryTuple`] instances that will be reused
-    /// throughout the associativity checking process.
-    ///
-    /// # Arguments
-    ///
-    /// * `_world` - Reference to World (unused but kept for API consistency)
-    /// * `n` - Size of the set to check operations on
-    ///
-    /// # Returns
-    ///
-    /// New AssociativityChecker ready for use
-    pub fn new(_world: &mut World, n: usize) -> Self {
-        Self {
-            tuple_ij: BinaryTuple::new_binary(n),
-            tuple_jk: BinaryTuple::new_binary(n),
-            tuple_fij_k: BinaryTuple::new_binary(n),
-            tuple_i_fjk: BinaryTuple::new_binary(n),
-            n,
-        }
-    }
-
-    /// Tests whether the given function represents an associative binary operation.
-    ///
-    /// Performs an exhaustive check of the associativity property by testing
-    /// all possible triples (i, j, k) and verifying that f(f(i,j), k) = f(i, f(j,k)).
-    ///
-    /// # Arguments
-    ///
-    /// * `world` - Reference to World containing function data
-    /// * `f` - Function handle representing the binary operation to test
-    ///
-    /// # Returns
-    ///
-    /// `true` if the operation is associative, `false` otherwise
-    ///
-    /// # Performance
-    ///
-    /// - **Time complexity**: O(n³) where n is the set size
-    /// - **Space complexity**: O(1) - uses only stack-allocated tuples
-    /// - **Early exit**: Returns `false` on first violation found
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// # use pshcalc::set::{World, FunctionHandle, AssociativityChecker};
-    /// let mut world = World::new();
-    /// let f = FunctionHandle::new(&mut world, 4, 2);
-    /// let mut checker = AssociativityChecker::new(&mut world, 2);
-    ///
-    /// let result = checker.is_associative(&world, &f);
-    /// // Result depends on the specific function values in f
-    /// ```
-    #[inline(always)]
-    pub fn is_associative(
-        &mut self,
-        world: &World,
-        f: &FunctionHandle,
-    ) -> bool {
-        for i in 0..self.n {
-            for j in 0..self.n {
-                for k in 0..self.n {
-                    // Using the unified trait interface - clean and performant
-                    self.tuple_ij.set(i, j);
-                    let f_i_j = f.apply(world, &self.tuple_ij);
-
-                    self.tuple_jk.set(j, k);
-                    let f_j_k = f.apply(world, &self.tuple_jk);
-
-                    self.tuple_fij_k.set(f_i_j, k);
-                    let left = f.apply(world, &self.tuple_fij_k);
-
-                    self.tuple_i_fjk.set(i, f_j_k);
-                    let right = f.apply(world, &self.tuple_i_fjk);
-
-                    if left != right {
-                        return false;
-                    }
-                }
-            }
-        }
-        true
     }
 }
