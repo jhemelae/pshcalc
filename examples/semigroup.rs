@@ -1,4 +1,4 @@
-use pshcalc::set::{AtomSet, HomSet, ProductSet, Variable, World};
+use pshcalc::set::{AtomSet, HomSet, ProductSet, World};
 use std::time::Instant;
 
 fn main() {
@@ -14,8 +14,8 @@ fn main() {
     function.initialize(&mut world);
 
     let mut count = 0;
-    while let Some(f) = function.get() {
-        if is_associative(&world, f, &a) {
+    while let Some(f) = function.get(&world) {
+        if is_associative(f, &a) {
             count += 1;
         }
         function.advance(&mut world);
@@ -26,23 +26,19 @@ fn main() {
     println!("Time elapsed is: {:?}", duration);
 }
 
-/// Check if a function is associative using direct StackAtom arrays.
+/// Check if a function is associative.
 /// A function f: A×A → A is associative if f(f(i,j),k) = f(i,f(j,k)) for all i,j,k ∈ A
-fn is_associative(
-    world: &World,
-    f: &pshcalc::set::FunctionHandle,
-    a: &AtomSet,
-) -> bool {
+fn is_associative(f: pshcalc::set::Function<'_>, a: &AtomSet) -> bool {
     for i in a {
         for j in a {
             for k in a {
                 // Calculate f(f(i,j), k)
-                let f_ij = f.apply(world, &[i.clone(), j.clone()]);
-                let left = f.apply(world, &[f_ij, k.clone()]);
+                let f_ij = f.apply(&[i.clone(), j.clone()]);
+                let left = f.apply(&[f_ij, k.clone()]);
 
                 // Calculate f(i, f(j,k))
-                let f_jk = f.apply(world, &[j.clone(), k.clone()]);
-                let right = f.apply(world, &[i.clone(), f_jk]);
+                let f_jk = f.apply(&[j.clone(), k.clone()]);
+                let right = f.apply(&[i.clone(), f_jk]);
 
                 if left != right {
                     return false;
