@@ -1,40 +1,29 @@
-use pshcalc::cat::CategoryVariable;
-use pshcalc::set::World;
+use pshcalc::cat::CategorySet;
+use pshcalc::cursor;
+use pshcalc::set::{Cursor, Set};
 use std::time::Instant;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let element_count = 4;
-    println!("Counting monoids with {} elements...", element_count);
+    let n = 4;
+
+    println!("Counting monoids with {} elements...", n);
 
     let start = Instant::now();
-    let monoid_count = count_monoids(element_count);
+
+    let category_set = CategorySet::new(1, vec![0; n - 1], vec![0; n - 1]);
+
+    let mut count = 0;
+    cursor!(_ in category_set {
+        count += 1;
+
+        if count % 100 == 0 {
+            println!("  Found {} so far...", count);
+        }
+    });
     let duration = start.elapsed();
 
-    println!(
-        "Found {} monoids on {} elements",
-        monoid_count, element_count
-    );
+    println!("Found {} monoids on {} elements", count, n);
     println!("Time elapsed: {:.2?}", duration);
 
     Ok(())
-}
-
-#[inline(always)]
-fn count_monoids(n: usize) -> usize {
-    let mut world = World::new();
-
-    let mut category_var = CategoryVariable::new(&mut world, 1, n);
-
-    let mut count = 0;
-    while let Some(category) = category_var.get(&world) {
-        if category.validate().is_ok() {
-            count += 1;
-            if count % 50 == 0 {
-                println!("  Found {} monoids so far...", count);
-            }
-        }
-        category_var.advance(&mut world);
-    }
-
-    count
 }

@@ -1,4 +1,5 @@
-use crate::set::{AtomSet, DataRange, Function, World};
+use crate::cursor;
+use crate::set::{AtomSet, BasicCursor, Cursor, Set};
 
 #[derive(Debug, PartialEq)]
 pub enum CategoryError {
@@ -33,266 +34,246 @@ impl std::fmt::Display for CategoryError {
 
 impl std::error::Error for CategoryError {}
 
-pub struct Category<'a> {
-    values: &'a [usize],
-    sizes: &'a [usize],
-    morphism_count: usize,
-    object_count: usize,
+// We assume list of objects and list of morphisms.
+// The first morphisms are the identities for each object, in the exact same order.
+// So the identity map is [0, 1, 2, ..., number_of_objects - 1]
+// Source, target and composition store only the values on non-identity morphisms.
+// This means for source and target that the first n values are omitted, where n is the number of objects.
+// For composition, the values for compositions involving identity morphisms are omitted.
+// These are the linearindexable tuples (i, j) where i < number_of_objects or j < number_of_objects.
+#[derive(Clone, Debug)]
+pub struct Category {
+    number_of_objects: usize,
+    number_of_morphisms: usize,
+    source: Vec<usize>,
+    target: Vec<usize>,
+    composition: Vec<usize>,
 }
 
-impl Category<'_> {
+impl Category {
     #[inline(always)]
-    pub fn source(&self) -> Function {
-        let range: std::ops::Range<usize> =
-            Self::source_range(self.morphism_count, self.object_count).into();
-        Function::new(&self.values[range.clone()], &self.sizes[range])
+    pub fn new(
+        number_of_objects: usize,
+        source: Vec<usize>,
+        target: Vec<usize>,
+        composition: Vec<usize>,
+    ) -> Self {
+        let number_of_morphisms = source.len() + number_of_objects;
+
+        Category {
+            number_of_objects,
+            number_of_morphisms,
+            source,
+            target,
+            composition,
+        }
     }
 
     #[inline(always)]
-    pub fn target(&self) -> Function {
-        let range: std::ops::Range<usize> =
-            Self::target_range(self.morphism_count, self.object_count).into();
-        Function::new(&self.values[range.clone()], &self.sizes[range])
+    pub fn number_of_objects(&self) -> usize {
+        self.number_of_objects
     }
 
     #[inline(always)]
-    pub fn identity(&self) -> Function {
-        let range: std::ops::Range<usize> =
-            Self::identity_range(self.morphism_count, self.object_count).into();
-        Function::new(&self.values[range.clone()], &self.sizes[range])
+    pub fn number_of_morphisms(&self) -> usize {
+        self.number_of_morphisms
     }
 
     #[inline(always)]
-    pub fn composition(&self) -> Function {
-        let range: std::ops::Range<usize> =
-            Self::composition_range(self.morphism_count, self.object_count)
-                .into();
-        Function::new(&self.values[range.clone()], &self.sizes[range])
+    pub fn objects(&self) -> AtomSet {
+        AtomSet::new(self.number_of_objects)
     }
 
     #[inline(always)]
-    fn source_range(morphism_count: usize, _object_count: usize) -> DataRange {
-        DataRange::new(0, morphism_count)
+    pub fn morphisms(&self) -> AtomSet {
+        AtomSet::new(self.number_of_morphisms)
     }
 
     #[inline(always)]
-    fn target_range(morphism_count: usize, _object_count: usize) -> DataRange {
-        DataRange::new(morphism_count, morphism_count)
+    pub fn source(&self, input: usize) -> usize {
+        // identity morphism?
+        if input < self.number_of_objects() {
+            return input;
+        }
+        self.source[input - self.number_of_objects()]
     }
 
     #[inline(always)]
-    fn identity_range(morphism_count: usize, object_count: usize) -> DataRange {
-        DataRange::new(2 * morphism_count, object_count)
+    pub fn target(&self, input: usize) -> usize {
+        // identity morphism?
+        if input < self.number_of_objects() {
+            return input;
+        }
+        self.target[input - self.number_of_objects()]
     }
 
     #[inline(always)]
-    fn composition_range(
-        morphism_count: usize,
-        object_count: usize,
-    ) -> DataRange {
-        DataRange::new(
-            2 * morphism_count + object_count,
-            morphism_count * morphism_count,
-        )
+    pub fn composition(&self, g: usize, f: usize) -> usize {
+        if g < self.number_of_objects() {
+            if self.target(f) == self.source(g) {
+                return f;
+            } else {
+                return 0;
+            }
+        }
+
+        if f < self.number_of_objects() {
+            if self.target(f) == self.source(g) {
+                return g;
+            } else {
+                return 0;
+            }
+        }
+
+        let j = g - self.number_of_objects();
+        let i = f - self.number_of_objects();
+        let n = self.number_of_morphisms() - self.number_of_objects();
+        let index = j * n + i;
+        self.composition[index]
     }
 
     #[inline(always)]
     pub fn validate(&self) -> Result<(), CategoryError> {
-        let objects = self.identity().domain();
-        let morphisms = self.source().domain();
-
-        let composition = self.composition();
-        let source = self.source();
-        let target = self.target();
-        let identity = self.identity();
-
-        self.validate_identity_laws(
-            &objects,
-            &morphisms,
-            &composition,
-            &source,
-            &target,
-            &identity,
-        )?;
-        self.validate_associativity(&morphisms, &composition)?;
-        self.validate_well_definedness(
-            &morphisms,
-            &composition,
-            &source,
-            &target,
-        )?;
+        self.validate_associativity()?;
+        self.validate_well_definedness()?;
         Ok(())
     }
 
     #[inline(always)]
-    fn validate_well_definedness(
-        &self,
-        morphisms: &AtomSet,
-        composition: &Function,
-        source: &Function,
-        target: &Function,
-    ) -> Result<(), CategoryError> {
-        for f in morphisms {
-            for g in morphisms {
-                let target_f = target.apply(&[f.clone()]);
-                let source_g = source.apply(&[g.clone()]);
-                let composition = composition.apply(&[g.clone(), f.clone()]);
+    fn validate_associativity(&self) -> Result<(), CategoryError> {
+        let morphisms = self.morphisms();
+        // we consider non-identity morphisms only
+        cursor!(f in morphisms {
+            cursor!(g in morphisms  {
+                cursor!(h in morphisms {
+                    let left = self.composition(self.composition(*h, *g), *f);
+                    let right = self.composition(*h, self.composition(*g, *f));
 
-                if target_f != source_g && composition.index != 0 {
+                    if left != right {
+                        return Err(CategoryError::NonAssociative {
+                            morphisms: (*h, *g, *f),
+                        });
+                    }
+                });
+            });
+        });
+        Ok(())
+    }
+
+    #[inline(always)]
+    fn validate_well_definedness(&self) -> Result<(), CategoryError> {
+        // we consider non-identity morphisms only
+        for f in self.number_of_objects()..self.number_of_morphisms() {
+            for g in self.number_of_objects()..self.number_of_morphisms() {
+                let target_f = self.target(f);
+                let source_g = self.source(g);
+                let composition = self.composition(g, f);
+
+                if target_f != source_g && composition != 0 {
                     return Err(CategoryError::IncompatibleComposition {
-                        g: g.index,
-                        f: f.index,
+                        g,
+                        f,
                     });
                 }
             }
         }
         Ok(())
     }
+}
 
+pub trait Advanceable {
+    fn advance(&mut self) -> bool;
+}
+
+impl Advanceable for Category {
     #[inline(always)]
-    fn validate_identity_laws(
-        &self,
-        objects: &AtomSet,
-        morphisms: &AtomSet,
-        composition: &Function,
-        source: &Function,
-        target: &Function,
-        identity: &Function,
-    ) -> Result<(), CategoryError> {
-        for x in objects {
-            let id_x = identity.apply(&[x.clone()]);
-
-            for f in morphisms {
-                let source_f = source.apply(&[f.clone()]);
-                let target_f = target.apply(&[f.clone()]);
-                if source_f == x {
-                    let composed =
-                        composition.apply(&[f.clone(), id_x.clone()]);
-                    if composed != f {
-                        return Err(CategoryError::NotAnIdentity {
-                            morphism: id_x.index,
-                        });
-                    }
-                }
-
-                if target_f == x {
-                    let composed =
-                        composition.apply(&[id_x.clone(), f.clone()]);
-                    if composed != f {
-                        return Err(CategoryError::NotAnIdentity {
-                            morphism: id_x.index,
-                        });
-                    }
-                }
+    fn advance(&mut self) -> bool {
+        for i in 0..self.composition.len() {
+            self.composition[i] += 1;
+            if self.composition[i] < self.number_of_morphisms() {
+                return false;
             }
+            self.composition[i] = 0;
         }
-        Ok(())
-    }
-
-    #[inline(always)]
-    fn validate_associativity(
-        &self,
-        morphisms: &AtomSet,
-        composition: &Function,
-    ) -> Result<(), CategoryError> {
-        for f in morphisms {
-            for g in morphisms {
-                for h in morphisms {
-                    let left = composition.apply(&[
-                        composition.apply(&[h.clone(), g.clone()]),
-                        f.clone(),
-                    ]);
-                    let right = composition.apply(&[
-                        h.clone(),
-                        composition.apply(&[g.clone(), f.clone()]),
-                    ]);
-
-                    if left != right {
-                        return Err(CategoryError::NonAssociative {
-                            morphisms: (h.index, g.index, f.index),
-                        });
-                    }
-                }
-            }
-        }
-        Ok(())
+        true
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct CategoryVariable {
-    data_range: DataRange,
-    morphism_count: usize,
-    object_count: usize,
-    done: bool,
+#[derive(Clone)]
+pub struct CategorySet {
+    number_of_objects: usize,
+    number_of_morphisms: usize,
+    source: Vec<usize>,
+    target: Vec<usize>,
 }
 
-impl CategoryVariable {
+impl CategorySet {
     #[inline(always)]
     pub fn new(
-        world: &mut World,
-        object_count: usize,
-        morphism_count: usize,
+        number_of_objects: usize,
+        source: Vec<usize>,
+        target: Vec<usize>,
     ) -> Self {
-        let total_len =
-            2 * morphism_count + object_count + morphism_count * morphism_count;
-        let data_range = world.alloc(total_len);
-
-        // Use Category's range helper functions to avoid code duplication
-        let sizes = world.get_sizes_mut(&data_range);
-
-        let source_range = Category::source_range(morphism_count, object_count);
-        let target_range = Category::target_range(morphism_count, object_count);
-        let identity_range =
-            Category::identity_range(morphism_count, object_count);
-        let composition_range =
-            Category::composition_range(morphism_count, object_count);
-
-        sizes[std::ops::Range::<usize>::from(source_range)].fill(object_count);
-        sizes[std::ops::Range::<usize>::from(target_range)].fill(object_count);
-        sizes[std::ops::Range::<usize>::from(identity_range)]
-            .fill(morphism_count);
-        sizes[std::ops::Range::<usize>::from(composition_range)]
-            .fill(morphism_count);
-
-        world.get_values_mut(&data_range).fill(0);
-
+        let number_of_morphisms = source.len() + number_of_objects;
         Self {
-            data_range,
-            morphism_count,
-            object_count,
-            done: false,
+            number_of_objects,
+            number_of_morphisms,
+            source,
+            target,
         }
+    }
+}
+
+impl Set<Category> for CategorySet {
+    #[inline(always)]
+    fn cursor(&self) -> impl Cursor<Category> {
+        BasicCursor::new(self.clone())
     }
 
     #[inline(always)]
-    pub fn initialize(&mut self, world: &mut World) {
-        self.done = false;
-        world.get_values_mut(&self.data_range).fill(0);
+    fn get_next<'a>(
+        &self,
+        current: &'a mut Option<Category>,
+    ) -> &'a Option<Category> {
+        if let Some(category) = current {
+            for i in 0..category.composition.len() {
+                category.composition[i] += 1;
+                if category.composition[i] < self.number_of_morphisms {
+                    if category.validate().is_ok() {
+                        return current;
+                    }
+                    return self.get_next(current);
+                }
+                category.composition[i] = 0;
+            }
+            *current = None;
+            return current;
+        } else {
+            *current = Some(Category::new(
+                self.number_of_objects,
+                self.source.clone(),
+                self.target.clone(),
+                vec![
+                    0;
+                    (self.number_of_morphisms - self.number_of_objects)
+                        * (self.number_of_morphisms - self.number_of_objects)
+                ],
+            ));
+            let cat = current.as_mut().unwrap();
+            if cat.validate().is_ok() {
+                return current;
+            }
+            return self.get_next(current);
+        }
     }
 
-    #[inline(always)]
-    pub fn advance(&mut self, world: &mut World) {
-        if self.done {
-            return;
+    fn get_index(&self, value: &Category) -> usize {
+        let mut index = 0;
+        let mut multiplier = 1;
+        for &img in &value.composition {
+            index += img * multiplier;
+            multiplier *= self.number_of_morphisms;
         }
-
-        let composition_range =
-            Category::composition_range(self.morphism_count, self.object_count);
-        self.done = world.advance_counter(&composition_range);
-    }
-
-    #[inline(always)]
-    pub fn get<'a>(&self, world: &'a World) -> Option<Category<'a>> {
-        if self.done {
-            return None;
-        }
-
-        Some(Category {
-            values: world.get_values(&self.data_range),
-            sizes: world.get_sizes(&self.data_range),
-            morphism_count: self.morphism_count,
-            object_count: self.object_count,
-        })
+        index
     }
 }

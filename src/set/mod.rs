@@ -1,202 +1,38 @@
-#[derive(Copy, Clone, Debug)]
-pub struct DataRange {
-    start: usize,
-    len: usize,
+pub trait Cursor<T> {
+    fn next(&mut self) -> Option<&T>;
 }
 
-impl DataRange {
-    #[inline(always)]
-    pub fn new(start: usize, len: usize) -> Self {
-        Self { start, len }
-    }
-
-    #[inline(always)]
-    pub fn start(&self) -> usize {
-        self.start
-    }
-}
-
-impl From<DataRange> for std::ops::Range<usize> {
-    #[inline(always)]
-    fn from(range: DataRange) -> Self {
-        range.start..range.start + range.len
-    }
-}
-
-#[derive(Debug)]
-pub struct World {
-    values: Vec<usize>,
-    sizes: Vec<usize>,
-}
-
-impl World {
-    pub fn new() -> Self {
-        Self {
-            values: Vec::new(),
-            sizes: Vec::new(),
+#[macro_export] // needed for macros used outside this module
+macro_rules! cursor {
+    ($pat:pat in $expr:tt { $($body:tt)* }) => {{
+        let mut __c = $expr.cursor();
+        while let Some($pat) = __c.next() {
+            { $($body)* }
         }
-    }
+    }};
+}
 
-    pub fn alloc(&mut self, count: usize) -> DataRange {
-        let start = self.values.len();
-        self.values.resize(start + count, 0);
-        self.sizes.resize(start + count, 0);
-        DataRange::new(start, count)
-    }
+pub trait Set<T> {
+    fn cursor(&self) -> impl Cursor<T>;
+    fn get_next<'a>(&self, current: &'a mut Option<T>) -> &'a Option<T>;
+    fn get_index(&self, value: &T) -> usize;
+}
 
-    #[inline(always)]
-    pub fn get_values(&self, range: &DataRange) -> &[usize] {
-        &self.values[range.start..range.start + range.len]
-    }
+pub struct BasicCursor<S: Set<T>, T> {
+    current: Option<T>,
+    set: S,
+}
 
-    #[inline(always)]
-    pub fn get_values_mut(&mut self, range: &DataRange) -> &mut [usize] {
-        &mut self.values[range.start..range.start + range.len]
-    }
-
-    #[inline(always)]
-    pub fn get_sizes(&self, range: &DataRange) -> &[usize] {
-        &self.sizes[range.start..range.start + range.len]
-    }
-
-    #[inline(always)]
-    pub fn get_sizes_mut(&mut self, range: &DataRange) -> &mut [usize] {
-        &mut self.sizes[range.start..range.start + range.len]
-    }
-
-    #[inline(always)]
-    pub fn advance_counter(&mut self, range: &DataRange) -> bool {
-        for i in range.start..range.start + range.len {
-            self.values[i] += 1;
-            if self.values[i] < self.sizes[i] {
-                return false;
-            }
-            self.values[i] = 0;
-        }
-        true
+impl<S: Set<T>, T> BasicCursor<S, T> {
+    pub fn new(set: S) -> Self {
+        Self { current: None, set }
     }
 }
 
-pub trait LinearIndexable {
-    fn to_linear_index(&self) -> usize;
-    fn to_linear_size(&self) -> usize;
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct Tuple<'a> {
-    indices: &'a [usize],
-    sizes: &'a [usize],
-}
-
-impl<'a> Tuple<'a> {
-    pub fn new(indices: &'a [usize], sizes: &'a [usize]) -> Self {
-        Self { indices, sizes }
+impl<S: Set<T>, T> Cursor<T> for BasicCursor<S, T> {
+    fn next(&mut self) -> Option<&T> {
+        self.set.get_next(&mut self.current).as_ref()
     }
-}
-
-impl LinearIndexable for Tuple<'_> {
-    #[inline(always)]
-    fn to_linear_index(&self) -> usize {
-        let mut index = 0;
-        let mut multiplier = 1;
-        for i in 0..self.indices.len() {
-            index += self.indices[i] * multiplier;
-            multiplier *= self.sizes[i];
-        }
-        index
-    }
-
-    #[inline(always)]
-    fn to_linear_size(&self) -> usize {
-        self.sizes.iter().product()
-    }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct Atom {
-    pub index: usize,
-    pub size: usize,
-}
-
-impl Atom {
-    /// Creates a new `Atom` with the specified index and size.
-    #[inline(always)]
-    pub fn new(index: usize, size: usize) -> Self {
-        Self { index, size }
-    }
-}
-
-impl LinearIndexable for Atom {
-    /// For atoms, the linear index is simply the contained index value.
-    #[inline(always)]
-    fn to_linear_index(&self) -> usize {
-        self.index
-    }
-
-    #[inline(always)]
-    fn to_linear_size(&self) -> usize {
-        self.size
-    }
-}
-
-impl<T, const N: usize> LinearIndexable for [T; N]
-where
-    T: LinearIndexable,
-    T: std::fmt::Debug,
-{
-    /// Calculate linear index for slices of `Atoms` using row-major order.
-    #[inline(always)]
-    fn to_linear_index(&self) -> usize {
-        if self.is_empty() {
-            return 0;
-        }
-
-        let mut result = 0;
-        let mut multiplier = 1;
-
-        for element in self.iter() {
-            result += element.to_linear_index() * multiplier;
-            multiplier *= element.to_linear_size();
-        }
-
-        result
-    }
-
-    #[inline(always)]
-    fn to_linear_size(&self) -> usize {
-        self.iter().map(|atom| atom.to_linear_size()).product()
-    }
-}
-
-#[derive(Debug)]
-pub struct Function<'a> {
-    values: &'a [usize],
-    sizes: &'a [usize],
-}
-
-impl<'a> Function<'a> {
-    /// Creates a new Function wrapper around the given values.
-    #[inline(always)]
-    pub fn new(values: &'a [usize], sizes: &'a [usize]) -> Self {
-        Self { values, sizes }
-    }
-
-    #[inline(always)]
-    pub fn apply<T: LinearIndexable>(&self, input: &T) -> Atom {
-        let linear_index = input.to_linear_index();
-        let result_index = self.values[linear_index];
-        let result_size = self.sizes[linear_index];
-        Atom::new(result_index, result_size)
-    }
-
-    #[inline(always)]
-    pub fn domain(&self) -> AtomSet {
-        AtomSet::new(self.sizes.len())
-    }
-}
-
-pub trait Set {
-    fn size(&self) -> usize;
 }
 
 #[derive(Clone)]
@@ -205,66 +41,63 @@ pub struct AtomSet {
 }
 
 impl AtomSet {
+    #[inline(always)]
     pub fn new(size: usize) -> Self {
         Self { size }
     }
 
     #[inline(always)]
-    pub fn iter(&self) -> AtomSetIterator {
-        AtomSetIterator {
-            current: 0,
-            size: self.size,
-        }
-    }
-}
-
-impl Set for AtomSet {
-    #[inline(always)]
-    fn size(&self) -> usize {
+    pub fn size(&self) -> usize {
         self.size
     }
 }
 
-pub struct AtomSetIterator {
-    current: usize,
-    size: usize,
-}
-
-impl Iterator for AtomSetIterator {
-    type Item = Atom;
+impl Set<usize> for AtomSet {
+    #[inline(always)]
+    fn cursor(&self) -> impl Cursor<usize> {
+        BasicCursor::new(self.clone())
+    }
 
     #[inline(always)]
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.current < self.size {
-            let atom = Atom::new(self.current, self.size);
-            self.current += 1;
-            Some(atom)
-        } else {
-            None
+    fn get_next<'a>(
+        &self,
+        current: &'a mut Option<usize>,
+    ) -> &'a Option<usize> {
+        match current {
+            Some(atom) => {
+                *atom += 1;
+                if *atom < self.size {
+                    current
+                } else {
+                    *current = None;
+                    current
+                }
+            }
+            None => {
+                *current = Some(0);
+                current
+            }
         }
     }
 
     #[inline(always)]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let remaining = self.size - self.current;
-        (remaining, Some(remaining))
+    fn get_index(&self, value: &usize) -> usize {
+        *value
     }
 }
 
-impl ExactSizeIterator for AtomSetIterator {
-    #[inline(always)]
-    fn len(&self) -> usize {
-        self.size - self.current
-    }
+#[derive(Clone, Debug, PartialEq)]
+pub struct BinaryProductSet {
+    left: usize,
+    right: usize,
 }
 
-impl IntoIterator for &AtomSet {
-    type Item = Atom;
-    type IntoIter = AtomSetIterator;
-
-    #[inline(always)]
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter()
+impl BinaryProductSet {
+    pub fn new(left: &AtomSet, right: &AtomSet) -> Self {
+        Self {
+            left: left.size(),
+            right: right.size(),
+        }
     }
 }
 
@@ -280,10 +113,51 @@ impl ProductSet {
     }
 }
 
-impl Set for ProductSet {
+impl Set<Vec<usize>> for ProductSet {
     #[inline(always)]
-    fn size(&self) -> usize {
-        self.sizes.iter().product()
+    fn cursor(&self) -> impl Cursor<Vec<usize>> {
+        BasicCursor::new(self.clone())
+    }
+
+    #[inline(always)]
+    fn get_next<'a>(
+        &self,
+        current: &'a mut Option<Vec<usize>>,
+    ) -> &'a Option<Vec<usize>> {
+        if let Some(tuple) = current {
+            for i in 0..self.sizes.len() {
+                tuple[i] += 1;
+                if tuple[i] < self.sizes[i] {
+                    return current;
+                } else {
+                    tuple[i] = 0;
+                }
+            }
+            *current = None;
+            current
+        } else {
+            *current = Some(vec![0; self.sizes.len()]);
+            current
+        }
+    }
+
+    #[inline(always)]
+    fn get_index(&self, value: &Vec<usize>) -> usize {
+        let mut index = 0;
+        let mut multiplier = 1;
+        for i in 0..self.sizes.len() {
+            index += value[i] * multiplier;
+            multiplier *= self.sizes[i];
+        }
+
+        index
+    }
+}
+
+impl From<ProductSet> for AtomSet {
+    fn from(product_set: ProductSet) -> Self {
+        let size = product_set.sizes.iter().product();
+        AtomSet::new(size)
     }
 }
 
@@ -294,73 +168,51 @@ pub struct HomSet {
 }
 
 impl HomSet {
-    /// Creates a new `HomSet` representing functions from source to target.
     #[inline(always)]
-    pub fn new<S: Set, T: Set>(source: &S, target: &T) -> Self {
+    pub fn new(source: &AtomSet, target: &AtomSet) -> Self {
         Self {
             domain_size: source.size(),
             target_size: target.size(),
         }
     }
-
-    pub fn create_variable(&self, world: &mut World) -> HomSetVariable {
-        HomSetVariable::new(world, self.domain_size, self.target_size)
-    }
 }
 
-impl Set for HomSet {
+impl Set<Vec<usize>> for HomSet {
     #[inline(always)]
-    fn size(&self) -> usize {
-        self.target_size
-            .pow(u32::try_from(self.domain_size).unwrap())
-    }
-}
-
-pub struct HomSetVariable {
-    done: bool,
-    range: DataRange,
-}
-
-impl HomSetVariable {
-    /// Creates a new HomSetVariable.
-    pub fn new(
-        world: &mut World,
-        domain_size: usize,
-        target_size: usize,
-    ) -> Self {
-        let range = world.alloc(domain_size);
-        let sizes = world.get_sizes_mut(&range);
-        for size in sizes.iter_mut() {
-            *size = target_size;
-        }
-        let done = false;
-
-        Self { done, range }
+    fn cursor(&self) -> impl Cursor<Vec<usize>> {
+        BasicCursor::new(self.clone())
     }
 
     #[inline(always)]
-    pub fn initialize(&mut self, world: &mut World) {
-        self.done = false;
-        world.get_values_mut(&self.range).fill(0);
-    }
-
-    #[inline(always)]
-    pub fn advance(&mut self, world: &mut World) {
-        if self.done {
-            return;
-        }
-
-        self.done = world.advance_counter(&self.range);
-    }
-
-    #[inline(always)]
-    pub fn get<'a>(&self, world: &'a World) -> Option<Function<'a>> {
-        if self.done {
-            None
+    fn get_next<'a>(
+        &self,
+        current: &'a mut Option<Vec<usize>>,
+    ) -> &'a Option<Vec<usize>> {
+        if let Some(function) = current {
+            for i in 0..self.domain_size {
+                function[i] += 1;
+                if function[i] < self.target_size {
+                    return current;
+                } else {
+                    function[i] = 0;
+                }
+            }
+            *current = None;
+            current
         } else {
-            let values = world.get_values(&self.range);
-            let sizes = world.get_sizes(&self.range);
-            Some(Function::new(values, sizes))
+            *current = Some(vec![0; self.domain_size]);
+            current
         }
+    }
+
+    #[inline(always)]
+    fn get_index(&self, value: &Vec<usize>) -> usize {
+        let mut index = 0;
+        let mut multiplier = 1;
+        for &img in value {
+            index += img * multiplier;
+            multiplier *= self.target_size;
+        }
+        index
     }
 }
