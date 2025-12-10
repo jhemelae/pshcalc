@@ -5,7 +5,6 @@ use crate::set::{AtomSet, BasicCursor, Cursor, Set};
 pub enum CategoryError {
     IncompatibleComposition { g: usize, f: usize },
     NonAssociative { morphisms: (usize, usize, usize) },
-    NotAnIdentity { morphism: usize },
 }
 
 impl std::fmt::Display for CategoryError {
@@ -24,9 +23,6 @@ impl std::fmt::Display for CategoryError {
                     "Non-associative composition: {:?}",
                     morphisms
                 )
-            }
-            CategoryError::NotAnIdentity { morphism } => {
-                write!(formatter, "Morphism {} is not an identity", morphism)
             }
         }
     }
