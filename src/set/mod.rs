@@ -15,7 +15,6 @@ macro_rules! cursor {
 pub trait Set<T> {
     fn cursor(&self) -> impl Cursor<T>;
     fn get_next<'a>(&self, current: &'a mut Option<T>) -> &'a Option<T>;
-    fn get_index(&self, value: &T) -> usize;
 }
 
 pub struct BasicCursor<S: Set<T>, T> {
@@ -79,11 +78,6 @@ impl Set<usize> for AtomSet {
             }
         }
     }
-
-    #[inline(always)]
-    fn get_index(&self, value: &usize) -> usize {
-        *value
-    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -110,6 +104,18 @@ impl ProductSet {
     pub fn new(atom_sets: &[AtomSet]) -> Self {
         let sizes = atom_sets.iter().map(AtomSet::size).collect();
         Self { sizes }
+    }
+
+    #[inline(always)]
+    pub fn get(&self, value: &[usize]) -> usize {
+        let mut index = 0;
+        let mut multiplier = 1;
+        for i in 0..self.sizes.len() {
+            index += value[i] * multiplier;
+            multiplier *= self.sizes[i];
+        }
+
+        index
     }
 }
 
@@ -140,18 +146,6 @@ impl Set<Vec<usize>> for ProductSet {
             current
         }
     }
-
-    #[inline(always)]
-    fn get_index(&self, value: &Vec<usize>) -> usize {
-        let mut index = 0;
-        let mut multiplier = 1;
-        for i in 0..self.sizes.len() {
-            index += value[i] * multiplier;
-            multiplier *= self.sizes[i];
-        }
-
-        index
-    }
 }
 
 impl From<ProductSet> for AtomSet {
@@ -174,6 +168,18 @@ impl HomSet {
             domain_size: source.size(),
             target_size: target.size(),
         }
+    }
+
+    #[inline(always)]
+    #[allow(dead_code)]
+    pub fn get(&self, value: &[usize]) -> usize {
+        let mut index = 0;
+        let mut multiplier = 1;
+        for &img in value {
+            index += img * multiplier;
+            multiplier *= self.target_size;
+        }
+        index
     }
 }
 
@@ -203,16 +209,5 @@ impl Set<Vec<usize>> for HomSet {
             *current = Some(vec![0; self.domain_size]);
             current
         }
-    }
-
-    #[inline(always)]
-    fn get_index(&self, value: &Vec<usize>) -> usize {
-        let mut index = 0;
-        let mut multiplier = 1;
-        for &img in value {
-            index += img * multiplier;
-            multiplier *= self.target_size;
-        }
-        index
     }
 }

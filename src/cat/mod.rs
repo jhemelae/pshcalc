@@ -181,24 +181,6 @@ impl Category {
     }
 }
 
-pub trait Advanceable {
-    fn advance(&mut self) -> bool;
-}
-
-impl Advanceable for Category {
-    #[inline(always)]
-    fn advance(&mut self) -> bool {
-        for i in 0..self.composition.len() {
-            self.composition[i] += 1;
-            if self.composition[i] < self.number_of_morphisms() {
-                return false;
-            }
-            self.composition[i] = 0;
-        }
-        true
-    }
-}
-
 #[derive(Clone)]
 pub struct CategorySet {
     number_of_objects: usize,
@@ -265,15 +247,5 @@ impl Set<Category> for CategorySet {
             }
             return self.get_next(current);
         }
-    }
-
-    fn get_index(&self, value: &Category) -> usize {
-        let mut index = 0;
-        let mut multiplier = 1;
-        for &img in &value.composition {
-            index += img * multiplier;
-            multiplier *= self.number_of_morphisms;
-        }
-        index
     }
 }
