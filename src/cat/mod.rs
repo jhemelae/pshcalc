@@ -1,5 +1,5 @@
 use crate::cursor;
-use crate::set::{AtomSet, BasicCursor, Cursor, Set};
+use crate::set::{AtomSet, Set, Variable};
 
 #[derive(Debug, PartialEq)]
 pub enum CategoryError {
@@ -63,6 +63,25 @@ impl Category {
             target,
             composition,
         }
+    }
+
+    #[inline(always)]
+    pub fn allocate(
+        number_of_objects: usize,
+        number_of_morphisms: usize,
+    ) -> Variable<Self> {
+        let non_identity_morphisms = number_of_morphisms - number_of_objects;
+        let category = Category {
+            number_of_objects,
+            number_of_morphisms,
+            source: vec![0; non_identity_morphisms],
+            target: vec![0; non_identity_morphisms],
+            composition: vec![
+                0;
+                non_identity_morphisms * non_identity_morphisms
+            ],
+        };
+        Variable::uninitialized(category)
     }
 
     #[inline(always)]
@@ -138,10 +157,9 @@ impl Category {
     #[inline(always)]
     fn validate_associativity(&self) -> Result<(), CategoryError> {
         let morphisms = self.morphisms();
-        // we consider non-identity morphisms only
-        cursor!(f in morphisms {
-            cursor!(g in morphisms  {
-                cursor!(h in morphisms {
+        cursor!(f in &morphisms => {
+            cursor!(g in &morphisms => {
+                cursor!(h in &morphisms => {
                     let left = self.composition(self.composition(*h, *g), *f);
                     let right = self.composition(*h, self.composition(*g, *f));
 
@@ -204,44 +222,43 @@ impl CategorySet {
 
 impl Set<Category> for CategorySet {
     #[inline(always)]
-    fn cursor(&self) -> impl Cursor<Category> {
-        BasicCursor::new(self.clone())
+    fn allocate(&self) -> Variable<Category> {
+        let category = Category::new(
+            self.number_of_objects,
+            self.source.clone(),
+            self.target.clone(),
+            vec![
+                0;
+                (self.number_of_morphisms - self.number_of_objects)
+                    * (self.number_of_morphisms - self.number_of_objects)
+            ],
+        );
+        Variable::uninitialized(category)
     }
 
     #[inline(always)]
-    fn get_next<'a>(
-        &self,
-        current: &'a mut Option<Category>,
-    ) -> &'a Option<Category> {
-        if let Some(category) = current {
-            for i in 0..category.composition.len() {
-                category.composition[i] += 1;
-                if category.composition[i] < self.number_of_morphisms {
-                    if category.validate().is_ok() {
-                        return current;
-                    }
-                    return self.get_next(current);
+    fn next<'a>(&self, current: &'a mut Category) -> bool {
+        for i in 0..current.composition.len() {
+            current.composition[i] += 1;
+            if current.composition[i] < self.number_of_morphisms {
+                if current.validate().is_ok() {
+                    return true;
                 }
-                category.composition[i] = 0;
+                return self.next(current);
             }
-            *current = None;
-            return current;
-        } else {
-            *current = Some(Category::new(
-                self.number_of_objects,
-                self.source.clone(),
-                self.target.clone(),
-                vec![
-                    0;
-                    (self.number_of_morphisms - self.number_of_objects)
-                        * (self.number_of_morphisms - self.number_of_objects)
-                ],
-            ));
-            let cat = current.as_mut().unwrap();
-            if cat.validate().is_ok() {
-                return current;
-            }
-            return self.get_next(current);
+            current.composition[i] = 0;
         }
+        false
+    }
+
+    #[inline(always)]
+    fn reset<'a>(&self, current: &'a mut Category) -> bool {
+        for i in 0..current.composition.len() {
+            current.composition[i] = 0;
+        }
+        if current.validate().is_ok() {
+            return true;
+        }
+        self.next(current)
     }
 }

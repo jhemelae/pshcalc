@@ -1,37 +1,76 @@
-pub trait Cursor<T> {
-    fn next(&mut self) -> Option<&T>;
+pub struct Variable<T> {
+    value: T,
+    ongoing: bool,
 }
 
-#[macro_export] // needed for macros used outside this module
+impl<T> Variable<T> {
+    #[inline(always)]
+    pub fn uninitialized(value: T) -> Self {
+        Variable {
+            value,
+            ongoing: false,
+        }
+    }
+
+    #[inline(always)]
+    pub fn get_uninitialized(&self) -> &T {
+        &self.value
+    }
+
+    #[inline(always)]
+    pub fn get_current(&self) -> Option<&T> {
+        match self.ongoing {
+            true => Some(&self.value),
+            false => None,
+        }
+    }
+
+    #[inline(always)]
+    pub fn advance<S: Set<T>>(&mut self, set: &S) {
+        self.ongoing = set.next(&mut self.value) && self.ongoing;
+    }
+
+    #[inline(always)]
+    pub fn initialize<S>(&mut self, set: &S)
+    where
+        S: Set<T>,
+    {
+        self.ongoing = set.reset(&mut self.value);
+    }
+}
+
+pub trait Set<T> {
+    fn allocate(&self) -> Variable<T>;
+    fn reset<'a>(&self, current: &'a mut T) -> bool;
+    fn next<'a>(&self, current: &'a mut T) -> bool;
+}
+
+#[macro_export]
 macro_rules! cursor {
-    ($pat:pat in $expr:tt { $($body:tt)* }) => {{
-        let mut __c = $expr.cursor();
-        while let Some($pat) = __c.next() {
-            { $($body)* }
+    ($x:tt in $iter:expr => { $($body:tt)* }) => {{
+        let mut __element = $iter.allocate();
+        __element.initialize($iter);
+        while let Some(__data) = __element.get_current() {
+            let $x = __data;
+            $($body)*
+            __element.advance($iter);
         }
     }};
 }
 
-pub trait Set<T> {
-    fn cursor(&self) -> impl Cursor<T>;
-    fn get_next<'a>(&self, current: &'a mut Option<T>) -> &'a Option<T>;
-}
-
-pub struct BasicCursor<S: Set<T>, T> {
-    current: Option<T>,
-    set: S,
-}
-
-impl<S: Set<T>, T> BasicCursor<S, T> {
-    pub fn new(set: S) -> Self {
-        Self { current: None, set }
-    }
-}
-
-impl<S: Set<T>, T> Cursor<T> for BasicCursor<S, T> {
-    fn next(&mut self) -> Option<&T> {
-        self.set.get_next(&mut self.current).as_ref()
-    }
+#[macro_export]
+macro_rules! traverse {
+    ($var:tt in $iter:expr => { $($body:tt)* }) => {{
+        $var.initialize($iter);
+        while let Some(__element) = $var.get_current() {
+            {
+                let $var = __element;
+                { let _ = $var; } // allow unused variable
+                $($body)*
+            }
+            $var.advance($iter);
+        }
+    }};
 }
 
 #[derive(Clone)]
@@ -53,29 +92,27 @@ impl AtomSet {
 
 impl Set<usize> for AtomSet {
     #[inline(always)]
-    fn cursor(&self) -> impl Cursor<usize> {
-        BasicCursor::new(self.clone())
+    fn allocate(&self) -> Variable<usize> {
+        Variable::uninitialized(0)
     }
 
     #[inline(always)]
-    fn get_next<'a>(
-        &self,
-        current: &'a mut Option<usize>,
-    ) -> &'a Option<usize> {
-        match current {
-            Some(atom) => {
-                *atom += 1;
-                if *atom < self.size {
-                    current
-                } else {
-                    *current = None;
-                    current
-                }
-            }
-            None => {
-                *current = Some(0);
-                current
-            }
+    fn next<'a>(&self, current: &'a mut usize) -> bool {
+        *current += 1;
+        if *current < self.size {
+            true
+        } else {
+            false
+        }
+    }
+
+    #[inline(always)]
+    fn reset<'a>(&self, current: &'a mut usize) -> bool {
+        *current = 0;
+        if *current < self.size {
+            true
+        } else {
+            false
         }
     }
 }
@@ -121,30 +158,29 @@ impl ProductSet {
 
 impl Set<Vec<usize>> for ProductSet {
     #[inline(always)]
-    fn cursor(&self) -> impl Cursor<Vec<usize>> {
-        BasicCursor::new(self.clone())
+    fn allocate(&self) -> Variable<Vec<usize>> {
+        Variable::uninitialized(vec![0; self.sizes.len()])
     }
 
     #[inline(always)]
-    fn get_next<'a>(
-        &self,
-        current: &'a mut Option<Vec<usize>>,
-    ) -> &'a Option<Vec<usize>> {
-        if let Some(tuple) = current {
-            for i in 0..self.sizes.len() {
-                tuple[i] += 1;
-                if tuple[i] < self.sizes[i] {
-                    return current;
-                } else {
-                    tuple[i] = 0;
-                }
+    fn next<'a>(&self, current: &'a mut Vec<usize>) -> bool {
+        for i in 0..self.sizes.len() {
+            current[i] += 1;
+            if current[i] < self.sizes[i] {
+                return true;
+            } else {
+                current[i] = 0;
             }
-            *current = None;
-            current
-        } else {
-            *current = Some(vec![0; self.sizes.len()]);
-            current
         }
+        false
+    }
+
+    #[inline(always)]
+    fn reset<'a>(&self, current: &'a mut Vec<usize>) -> bool {
+        for i in 0..self.sizes.len() {
+            current[i] = 0;
+        }
+        true
     }
 }
 
@@ -185,29 +221,28 @@ impl HomSet {
 
 impl Set<Vec<usize>> for HomSet {
     #[inline(always)]
-    fn cursor(&self) -> impl Cursor<Vec<usize>> {
-        BasicCursor::new(self.clone())
+    fn allocate(&self) -> Variable<Vec<usize>> {
+        Variable::uninitialized(vec![0; self.domain_size])
     }
 
     #[inline(always)]
-    fn get_next<'a>(
-        &self,
-        current: &'a mut Option<Vec<usize>>,
-    ) -> &'a Option<Vec<usize>> {
-        if let Some(function) = current {
-            for i in 0..self.domain_size {
-                function[i] += 1;
-                if function[i] < self.target_size {
-                    return current;
-                } else {
-                    function[i] = 0;
-                }
+    fn next<'a>(&self, current: &'a mut Vec<usize>) -> bool {
+        for i in 0..self.domain_size {
+            current[i] += 1;
+            if current[i] < self.target_size {
+                return true;
+            } else {
+                current[i] = 0;
             }
-            *current = None;
-            current
-        } else {
-            *current = Some(vec![0; self.domain_size]);
-            current
         }
+        false
+    }
+
+    #[inline(always)]
+    fn reset<'a>(&self, current: &'a mut Vec<usize>) -> bool {
+        for i in 0..self.domain_size {
+            current[i] = 0;
+        }
+        true
     }
 }
