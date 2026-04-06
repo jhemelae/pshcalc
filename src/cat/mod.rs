@@ -31,8 +31,8 @@ impl std::error::Error for CategoryError {}
 // These are the linearindexable tuples (i, j) where i < number_of_objects or j < number_of_objects.
 #[derive(Clone, Debug)]
 pub struct Category {
-    number_of_objects: usize,
-    number_of_morphisms: usize,
+    pub number_of_objects: usize,
+    pub number_of_morphisms: usize,
     source: Vec<usize>,
     target: Vec<usize>,
     composition: Vec<usize>,
@@ -71,16 +71,6 @@ impl Category {
     }
 
     #[inline(always)]
-    pub fn number_of_objects(&self) -> usize {
-        self.number_of_objects
-    }
-
-    #[inline(always)]
-    pub fn number_of_morphisms(&self) -> usize {
-        self.number_of_morphisms
-    }
-
-    #[inline(always)]
     pub fn objects(&self) -> AtomSet {
         AtomSet::new(self.number_of_objects)
     }
@@ -93,24 +83,24 @@ impl Category {
     #[inline(always)]
     pub fn source(&self, input: usize) -> usize {
         // identity morphism?
-        if input < self.number_of_objects() {
+        if input < self.number_of_objects {
             return input;
         }
-        self.source[input - self.number_of_objects()]
+            self.source[input - self.number_of_objects]
     }
 
     #[inline(always)]
     pub fn target(&self, input: usize) -> usize {
         // identity morphism?
-        if input < self.number_of_objects() {
+            if input < self.number_of_objects {
             return input;
         }
-        self.target[input - self.number_of_objects()]
+        self.target[input - self.number_of_objects]
     }
 
     #[inline(always)]
     pub fn composition(&self, g: usize, f: usize) -> usize {
-        if g < self.number_of_objects() {
+        if g < self.number_of_objects {
             if self.target(f) == self.source(g) {
                 return f;
             } else {
@@ -118,7 +108,7 @@ impl Category {
             }
         }
 
-        if f < self.number_of_objects() {
+        if f < self.number_of_objects {
             if self.target(f) == self.source(g) {
                 return g;
             } else {
@@ -126,9 +116,9 @@ impl Category {
             }
         }
 
-        let j = g - self.number_of_objects();
-        let i = f - self.number_of_objects();
-        let n = self.number_of_morphisms() - self.number_of_objects();
+        let j = g - self.number_of_objects;
+        let i = f - self.number_of_objects;
+        let n = self.number_of_morphisms - self.number_of_objects;
         let index = j * n + i;
         self.composition[index]
     }
@@ -163,8 +153,8 @@ impl Category {
     #[inline(always)]
     fn validate_well_definedness(&self) -> Result<(), CategoryError> {
         // we consider non-identity morphisms only
-        for f in self.number_of_objects()..self.number_of_morphisms() {
-            for g in self.number_of_objects()..self.number_of_morphisms() {
+        for f in self.number_of_objects..self.number_of_morphisms {
+            for g in self.number_of_objects..self.number_of_morphisms {
                 let target_f = self.target(f);
                 let source_g = self.source(g);
                 let composition = self.composition(g, f);

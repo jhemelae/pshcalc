@@ -26,16 +26,16 @@ pub struct Presheaf {
     pub number_of_sections: usize,
     pub number_of_objects: usize,
     pub number_of_morphisms: usize,
-    pub pi: Vec<usize>,
-    pub action: Vec<usize>,
+    pi: Vec<usize>,
+    action: Vec<usize>,
 }
 
 impl Presheaf {
     #[inline(always)]
     pub fn new(category: &Category, pi: Vec<usize>, action: Vec<usize>) -> Self {
         let number_of_sections = pi.len();
-        let number_of_morphisms = category.number_of_morphisms();
-        let number_of_objects = category.number_of_objects();
+        let number_of_morphisms = category.number_of_morphisms;
+        let number_of_objects = category.number_of_objects;
         Presheaf {
             number_of_sections,
             number_of_objects,
@@ -61,23 +61,8 @@ impl Presheaf {
     }
 
     #[inline(always)]
-    pub fn number_of_sections(&self) -> usize {
-        self.number_of_sections
-    }
-
-    #[inline(always)]
-    pub fn number_of_objects(&self) -> usize {
-        self.number_of_objects
-    }
-
-    #[inline(always)]
-    pub fn number_of_morphisms(&self) -> usize {
-        self.number_of_morphisms
-    }
-
-    #[inline(always)]
     pub fn sections(&self) -> AtomSet {
-        AtomSet::new(self.number_of_sections())
+        AtomSet::new(self.number_of_sections)
     }
 
     #[inline(always)]
@@ -88,11 +73,11 @@ impl Presheaf {
     #[inline(always)]
     pub fn action(&self, section: usize, morphism: usize) -> usize {
         // identity?
-        if morphism < self.number_of_objects() {
+        if morphism < self.number_of_objects {
             return section;
         }
-        let morphism = morphism - self.number_of_objects();
-        self.action[section + morphism * self.number_of_sections()]
+        let morphism = morphism - self.number_of_objects;
+        self.action[section + morphism * self.number_of_sections]
     }
 
     #[inline(always)]
@@ -167,7 +152,7 @@ impl Set<Presheaf> for PresheafSet<'_> {
     #[inline(always)]
     fn allocate(&self) -> Variable<Presheaf> {
         let number_of_nonidentity_morphisms =
-            self.category.number_of_morphisms() - self.category.number_of_objects();
+            self.category.number_of_morphisms - self.category.number_of_objects;
         let number_of_sections = self.pi.len();
         let presheaf = Presheaf::new(
             self.category,
