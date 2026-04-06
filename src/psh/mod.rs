@@ -178,12 +178,12 @@ impl Set<Presheaf> for PresheafSet<'_> {
     }
 
     #[inline(always)]
-    fn next<'a>(&self, current: &'a mut Presheaf) -> bool {
+    fn next(&self, current: &mut Presheaf) -> bool {
         let number_of_sections = self.pi.len();
         for i in 0..current.action.len() {
             current.action[i] += 1;
             if current.action[i] < number_of_sections {
-                if current.validate(&self.category).is_ok() {
+                if current.validate(self.category).is_ok() {
                     return true;
                 }
                 return self.next(current);
@@ -195,14 +195,14 @@ impl Set<Presheaf> for PresheafSet<'_> {
     }
 
     #[inline(always)]
-    fn reset<'a>(&self, current: &'a mut Presheaf) -> bool {
+    fn reset(&self, current: &mut Presheaf) -> bool {
         for i in 0..current.pi.len() {
             current.pi[i] = 0;
         }
         for i in 0..current.action.len() {
             current.action[i] = 0;
         }
-        if current.validate(&self.category).is_ok() {
+        if current.validate(self.category).is_ok() {
             return true;
         }
         self.next(current)

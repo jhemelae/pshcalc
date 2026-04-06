@@ -216,7 +216,7 @@ impl Set<Category> for CategorySet {
     }
 
     #[inline(always)]
-    fn next<'a>(&self, current: &'a mut Category) -> bool {
+    fn next(&self, current: &mut Category) -> bool {
         for i in 0..current.composition.len() {
             current.composition[i] += 1;
             if current.composition[i] < self.number_of_morphisms {
@@ -231,7 +231,7 @@ impl Set<Category> for CategorySet {
     }
 
     #[inline(always)]
-    fn reset<'a>(&self, current: &'a mut Category) -> bool {
+    fn reset(&self, current: &mut Category) -> bool {
         for i in 0..current.composition.len() {
             current.composition[i] = 0;
         }

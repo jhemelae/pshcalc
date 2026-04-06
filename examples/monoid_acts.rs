@@ -16,7 +16,7 @@ fn avg(n: usize, m: usize) -> f64 {
     let pi = vec![0; m];
     let monoid_set = pshcalc::cat::CategorySet::new(1, vec![0; n - 1], vec![0; n - 1]);
     traverse!(monoid in &monoid_set => {
-        let presheaf_set = PresheafSet::new(&monoid, &pi);
+        let presheaf_set = PresheafSet::new(monoid, &pi);
         let mut act_count = 0;
         traverse!(presheaf in &presheaf_set => {
             act_count += 1;

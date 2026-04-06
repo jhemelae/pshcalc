@@ -14,7 +14,7 @@ fn main() {
 
     let mut count = 0;
     cursor!(f in &multiplications => {
-        if is_associative(&f, &a, &a_x_a) {
+        if is_associative(f, &a, &a_x_a) {
             count += 1;
         }
     });
