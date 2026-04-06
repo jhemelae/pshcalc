@@ -34,8 +34,8 @@ impl Presheaf {
     #[inline(always)]
     pub fn new(category: &Category, pi: Vec<usize>, action: Vec<usize>) -> Self {
         let number_of_sections = pi.len();
-        let number_of_morphisms = category.number_of_morphisms;
-        let number_of_objects = category.number_of_objects;
+        let number_of_morphisms = category.morphisms().size();
+        let number_of_objects = category.objects().size();
         Presheaf {
             number_of_sections,
             number_of_objects,
@@ -152,7 +152,7 @@ impl Set<Presheaf> for PresheafSet<'_> {
     #[inline(always)]
     fn allocate(&self) -> Variable<Presheaf> {
         let number_of_nonidentity_morphisms =
-            self.category.number_of_morphisms - self.category.number_of_objects;
+            self.category.morphisms().size() - self.category.objects().size();
         let number_of_sections = self.pi.len();
         let presheaf = Presheaf::new(
             self.category,

@@ -31,32 +31,14 @@ impl std::error::Error for CategoryError {}
 // These are the linearindexable tuples (i, j) where i < number_of_objects or j < number_of_objects.
 #[derive(Clone, Debug)]
 pub struct Category {
-    pub number_of_objects: usize,
-    pub number_of_morphisms: usize,
+    number_of_objects: usize,
+    number_of_morphisms: usize,
     source: Vec<usize>,
     target: Vec<usize>,
     composition: Vec<usize>,
 }
 
 impl Category {
-    #[inline(always)]
-    pub fn new(
-        number_of_objects: usize,
-        source: Vec<usize>,
-        target: Vec<usize>,
-        composition: Vec<usize>,
-    ) -> Self {
-        let number_of_morphisms = source.len() + number_of_objects;
-
-        Category {
-            number_of_objects,
-            number_of_morphisms,
-            source,
-            target,
-            composition,
-        }
-    }
-
     #[inline(always)]
     pub fn allocate(number_of_objects: usize, number_of_morphisms: usize) -> Variable<Self> {
         let non_identity_morphisms = number_of_morphisms - number_of_objects;
@@ -169,39 +151,28 @@ impl Category {
 }
 
 #[derive(Clone)]
-pub struct CategorySet {
+pub struct VaryCompositionSet {
     number_of_objects: usize,
     number_of_morphisms: usize,
     source: Vec<usize>,
     target: Vec<usize>,
 }
 
-impl CategorySet {
-    #[inline(always)]
-    pub fn new(number_of_objects: usize, source: Vec<usize>, target: Vec<usize>) -> Self {
-        let number_of_morphisms = source.len() + number_of_objects;
-        Self {
-            number_of_objects,
-            number_of_morphisms,
-            source,
-            target,
-        }
-    }
-}
 
-impl Set<Category> for CategorySet {
+impl Set<Category> for VaryCompositionSet {
     #[inline(always)]
     fn allocate(&self) -> Variable<Category> {
-        let category = Category::new(
-            self.number_of_objects,
-            self.source.clone(),
-            self.target.clone(),
-            vec![
+        let category = Category {
+            number_of_objects: self.number_of_objects,
+            number_of_morphisms: self.number_of_morphisms,
+            source: self.source.clone(),
+            target: self.target.clone(),
+            composition: vec![
                 0;
                 (self.number_of_morphisms - self.number_of_objects)
                     * (self.number_of_morphisms - self.number_of_objects)
             ],
-        );
+        };
         Variable::uninitialized(category)
     }
 
@@ -231,3 +202,15 @@ impl Set<Category> for CategorySet {
         self.next(current)
     }
 }
+
+pub fn monoids(size: usize) -> VaryCompositionSet {
+    VaryCompositionSet {
+        number_of_objects: 1,
+        number_of_morphisms: size,
+        source: vec![0;size-1],
+        target: vec![0;size-1],
+    }
+}
+
+        
+

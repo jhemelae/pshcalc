@@ -1,4 +1,4 @@
-use pshcalc::cat::Category;
+use pshcalc::cat::{Category, monoids};
 use pshcalc::psh::{Presheaf, PresheafSet};
 use pshcalc::traverse;
 use std::time::Instant;
@@ -14,7 +14,8 @@ fn avg(n: usize, m: usize) -> f64 {
     let mut monoid = Category::allocate(1, n);
     let mut presheaf = Presheaf::allocate(1, n, m);
     let pi = vec![0; m];
-    let monoid_set = pshcalc::cat::CategorySet::new(1, vec![0; n - 1], vec![0; n - 1]);
+    let monoid_set = monoids(n);
+
     traverse!(monoid in &monoid_set => {
         let presheaf_set = PresheafSet::new(monoid, &pi);
         let mut act_count = 0;
