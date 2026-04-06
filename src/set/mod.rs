@@ -118,21 +118,6 @@ impl Set<usize> for AtomSet {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct BinaryProductSet {
-    left: usize,
-    right: usize,
-}
-
-impl BinaryProductSet {
-    pub fn new(left: &AtomSet, right: &AtomSet) -> Self {
-        Self {
-            left: left.size(),
-            right: right.size(),
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq)]
 pub struct ProductSet {
     sizes: Vec<usize>,
 }

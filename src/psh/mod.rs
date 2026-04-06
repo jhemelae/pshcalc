@@ -32,11 +32,7 @@ pub struct Presheaf {
 
 impl Presheaf {
     #[inline(always)]
-    pub fn new(
-        category: &Category,
-        pi: Vec<usize>,
-        action: Vec<usize>,
-    ) -> Self {
+    pub fn new(category: &Category, pi: Vec<usize>, action: Vec<usize>) -> Self {
         let number_of_sections = pi.len();
         let number_of_morphisms = category.number_of_morphisms();
         let number_of_objects = category.number_of_objects();
@@ -60,11 +56,7 @@ impl Presheaf {
             number_of_objects,
             number_of_morphisms,
             pi: vec![0; number_of_sections],
-            action: vec![
-                0;
-                number_of_sections
-                    * (number_of_morphisms - number_of_objects)
-            ],
+            action: vec![0; number_of_sections * (number_of_morphisms - number_of_objects)],
         })
     }
 
@@ -111,10 +103,7 @@ impl Presheaf {
     }
 
     #[inline(always)]
-    fn validate_associativity(
-        &self,
-        category: &Category,
-    ) -> Result<(), PresheafError> {
+    fn validate_associativity(&self, category: &Category) -> Result<(), PresheafError> {
         let sections = self.sections();
         let morphisms = category.morphisms();
 
@@ -136,10 +125,7 @@ impl Presheaf {
     }
 
     #[inline(always)]
-    pub fn validate_well_definedness(
-        &self,
-        category: &Category,
-    ) -> Result<(), PresheafError> {
+    pub fn validate_well_definedness(&self, category: &Category) -> Result<(), PresheafError> {
         let sections = self.sections();
         let morphisms = category.morphisms();
 
@@ -181,8 +167,7 @@ impl Set<Presheaf> for PresheafSet<'_> {
     #[inline(always)]
     fn allocate(&self) -> Variable<Presheaf> {
         let number_of_nonidentity_morphisms =
-            self.category.number_of_morphisms()
-                - self.category.number_of_objects();
+            self.category.number_of_morphisms() - self.category.number_of_objects();
         let number_of_sections = self.pi.len();
         let presheaf = Presheaf::new(
             self.category,

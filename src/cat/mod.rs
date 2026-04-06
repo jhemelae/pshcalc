@@ -11,18 +11,10 @@ impl std::fmt::Display for CategoryError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             CategoryError::IncompatibleComposition { g, f } => {
-                write!(
-                    formatter,
-                    "Incompatible composition: g={} and f={}",
-                    g, f
-                )
+                write!(formatter, "Incompatible composition: g={} and f={}", g, f)
             }
             CategoryError::NonAssociative { morphisms } => {
-                write!(
-                    formatter,
-                    "Non-associative composition: {:?}",
-                    morphisms
-                )
+                write!(formatter, "Non-associative composition: {:?}", morphisms)
             }
         }
     }
@@ -66,20 +58,14 @@ impl Category {
     }
 
     #[inline(always)]
-    pub fn allocate(
-        number_of_objects: usize,
-        number_of_morphisms: usize,
-    ) -> Variable<Self> {
+    pub fn allocate(number_of_objects: usize, number_of_morphisms: usize) -> Variable<Self> {
         let non_identity_morphisms = number_of_morphisms - number_of_objects;
         let category = Category {
             number_of_objects,
             number_of_morphisms,
             source: vec![0; non_identity_morphisms],
             target: vec![0; non_identity_morphisms],
-            composition: vec![
-                0;
-                non_identity_morphisms * non_identity_morphisms
-            ],
+            composition: vec![0; non_identity_morphisms * non_identity_morphisms],
         };
         Variable::uninitialized(category)
     }
@@ -184,10 +170,7 @@ impl Category {
                 let composition = self.composition(g, f);
 
                 if target_f != source_g && composition != 0 {
-                    return Err(CategoryError::IncompatibleComposition {
-                        g,
-                        f,
-                    });
+                    return Err(CategoryError::IncompatibleComposition { g, f });
                 }
             }
         }
@@ -205,11 +188,7 @@ pub struct CategorySet {
 
 impl CategorySet {
     #[inline(always)]
-    pub fn new(
-        number_of_objects: usize,
-        source: Vec<usize>,
-        target: Vec<usize>,
-    ) -> Self {
+    pub fn new(number_of_objects: usize, source: Vec<usize>, target: Vec<usize>) -> Self {
         let number_of_morphisms = source.len() + number_of_objects;
         Self {
             number_of_objects,
