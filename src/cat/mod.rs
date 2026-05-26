@@ -22,6 +22,14 @@ impl std::fmt::Display for CategoryError {
 
 impl std::error::Error for CategoryError {}
 
+pub trait Category {
+    fn objects(&self) -> impl Set<usize>;
+    fn morphisms(&self) -> impl Set<usize>; 
+    fn source(&self, input: usize) -> usize;
+    fn target(&self, input: usize) -> usize;
+    fn composition(&self, g: usize, f: usize) -> usize;
+} 
+ 
 // We assume list of objects and list of morphisms.
 // The first morphisms are the identities for each object, in the exact same order.
 // So the identity map is [0, 1, 2, ..., number_of_objects - 1]
@@ -30,7 +38,7 @@ impl std::error::Error for CategoryError {}
 // For composition, the values for compositions involving identity morphisms are omitted.
 // These are the linearindexable tuples (i, j) where i < number_of_objects or j < number_of_objects.
 #[derive(Clone, Debug)]
-pub struct Category {
+pub struct AtomCategory {
     number_of_objects: usize,
     number_of_morphisms: usize,
     source: Vec<usize>,
@@ -38,32 +46,20 @@ pub struct Category {
     composition: Vec<usize>,
 }
 
-impl Category {
-    #[inline(always)]
-    pub fn allocate(number_of_objects: usize, number_of_morphisms: usize) -> Variable<Self> {
-        let non_identity_morphisms = number_of_morphisms - number_of_objects;
-        let category = Category {
-            number_of_objects,
-            number_of_morphisms,
-            source: vec![0; non_identity_morphisms],
-            target: vec![0; non_identity_morphisms],
-            composition: vec![0; non_identity_morphisms * non_identity_morphisms],
-        };
-        Variable::uninitialized(category)
-    }
 
+impl Category for AtomCategory {
     #[inline(always)]
-    pub fn objects(&self) -> AtomSet {
+    fn objects(&self) -> impl Set<usize> {
         AtomSet::new(self.number_of_objects)
     }
 
     #[inline(always)]
-    pub fn morphisms(&self) -> AtomSet {
+    fn morphisms(&self) -> impl Set<usize> {
         AtomSet::new(self.number_of_morphisms)
     }
 
     #[inline(always)]
-    pub fn source(&self, input: usize) -> usize {
+    fn source(&self, input: usize) -> usize {
         // identity morphism?
         if input < self.number_of_objects {
             return input;
@@ -72,7 +68,7 @@ impl Category {
     }
 
     #[inline(always)]
-    pub fn target(&self, input: usize) -> usize {
+    fn target(&self, input: usize) -> usize {
         // identity morphism?
             if input < self.number_of_objects {
             return input;
@@ -81,7 +77,7 @@ impl Category {
     }
 
     #[inline(always)]
-    pub fn composition(&self, g: usize, f: usize) -> usize {
+    fn composition(&self, g: usize, f: usize) -> usize {
         if g < self.number_of_objects {
             if self.target(f) == self.source(g) {
                 return f;
@@ -104,7 +100,9 @@ impl Category {
         let index = j * n + i;
         self.composition[index]
     }
+}
 
+impl AtomCategory {
     #[inline(always)]
     pub fn validate(&self) -> Result<(), CategoryError> {
         self.validate_associativity()?;
@@ -159,10 +157,10 @@ pub struct VaryCompositionSet {
 }
 
 
-impl Set<Category> for VaryCompositionSet {
+impl Set<AtomCategory> for VaryCompositionSet {
     #[inline(always)]
-    fn allocate(&self) -> Variable<Category> {
-        let category = Category {
+    fn allocate(&self) -> Variable<AtomCategory> {
+        let category = AtomCategory {
             number_of_objects: self.number_of_objects,
             number_of_morphisms: self.number_of_morphisms,
             source: self.source.clone(),
@@ -173,31 +171,35 @@ impl Set<Category> for VaryCompositionSet {
                     * (self.number_of_morphisms - self.number_of_objects)
             ],
         };
-        Variable::uninitialized(category)
+        Variable {
+            value: category,
+            ongoing: false
+        }
     }
 
     #[inline(always)]
-    fn next(&self, current: &mut Category) -> bool {
-        for i in 0..current.composition.len() {
-            current.composition[i] += 1;
-            if current.composition[i] < self.number_of_morphisms {
-                if current.validate().is_ok() {
-                    return true;
+    fn next(&self, current: &mut Variable<AtomCategory>) {
+        for i in 0..current.value.composition.len() {
+            current.value.composition[i] += 1;
+            if current.value.composition[i] < self.number_of_morphisms {
+                if current.value.validate().is_ok() {
+                    current.ongoing = true;
+                    return;
                 }
                 return self.next(current);
             }
-            current.composition[i] = 0;
+            current.value.composition[i] = 0;
         }
-        false
+        current.ongoing = false;
     }
 
     #[inline(always)]
-    fn reset(&self, current: &mut Category) -> bool {
-        for i in 0..current.composition.len() {
-            current.composition[i] = 0;
+    fn reset(&self, current: &mut Variable<AtomCategory>) {
+        for i in 0..current.value.composition.len() {
+            current.value.composition[i] = 0;
         }
-        if current.validate().is_ok() {
-            return true;
+        if current.value.validate().is_ok() {
+            current.ongoing = true;
         }
         self.next(current)
     }

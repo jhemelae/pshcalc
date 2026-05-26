@@ -1,77 +1,39 @@
 pub struct Variable<T> {
-    value: T,
-    ongoing: bool,
+    pub value: T,
+    pub ongoing: bool,
 }
 
-impl<T> Variable<T> {
-    #[inline(always)]
-    pub fn uninitialized(value: T) -> Self {
-        Variable {
-            value,
-            ongoing: false,
-        }
-    }
-
-    #[inline(always)]
-    pub fn get_uninitialized(&self) -> &T {
-        &self.value
-    }
-
-    #[inline(always)]
-    pub fn get_current(&self) -> Option<&T> {
-        match self.ongoing {
-            true => Some(&self.value),
-            false => None,
-        }
-    }
-
-    #[inline(always)]
-    pub fn advance<S: Set<T>>(&mut self, set: &S) {
-        self.ongoing = set.next(&mut self.value) && self.ongoing;
-    }
-
-    #[inline(always)]
-    pub fn initialize<S>(&mut self, set: &S)
-    where
-        S: Set<T>,
-    {
-        self.ongoing = set.reset(&mut self.value);
-    }
-}
 
 pub trait Set<T> {
     fn allocate(&self) -> Variable<T>;
-    fn reset(&self, current: &mut T) -> bool;
-    fn next(&self, current: &mut T) -> bool;
+    fn reset(&self, current: &mut Variable<T>);
+    fn next(&self, current: &mut Variable<T>);
+    fn size(&self) -> usize {
+        let mut var = self.allocate();
+        let mut count = 0;
+        self.reset(&mut var);
+        while var.ongoing {
+            self.next(&mut var);
+            count += 1;
+        }
+        count
+    }
 }
 
 #[macro_export]
 macro_rules! cursor {
-    ($x:tt in $iter:expr => { $($body:tt)* }) => {{
+    ($var:tt in $iter:expr => { $($body:tt)* }) => {{
         let mut __element = $iter.allocate();
-        __element.initialize($iter);
-        while let Some(__data) = __element.get_current() {
-            let $x = __data;
+        $iter.reset(&mut __element);
+        while __element.ongoing {
+            let $var = &__element.value;
+            { let _ = $var; } // allow unused variable
             $($body)*
-            __element.advance($iter);
+            $iter.next(&mut __element);
         }
     }};
 }
 
-#[macro_export]
-macro_rules! traverse {
-    ($var:tt in $iter:expr => { $($body:tt)* }) => {{
-        $var.initialize($iter);
-        while let Some(__element) = $var.get_current() {
-            {
-                let $var = __element;
-                { let _ = $var; } // allow unused variable
-                $($body)*
-            }
-            $var.advance($iter);
-        }
-    }};
-}
 
 #[derive(Clone)]
 pub struct AtomSet {
@@ -93,19 +55,22 @@ impl AtomSet {
 impl Set<usize> for AtomSet {
     #[inline(always)]
     fn allocate(&self) -> Variable<usize> {
-        Variable::uninitialized(0)
+        Variable {
+           value: 0,
+           ongoing: false
+        } 
     }
 
     #[inline(always)]
-    fn next(&self, current: &mut usize) -> bool {
-        *current += 1;
-        *current < self.size
+    fn next(&self, current: &mut Variable<usize>) {
+        current.value += 1;
+        current.ongoing = current.value < self.size
     }
 
     #[inline(always)]
-    fn reset(&self, current: &mut usize) -> bool {
-        *current = 0;
-        *current < self.size
+    fn reset(&self, current: &mut Variable<usize>) {
+        current.value = 0;
+        current.ongoing = self.size > 0;
     }
 }
 
@@ -136,28 +101,32 @@ impl ProductSet {
 impl Set<Vec<usize>> for ProductSet {
     #[inline(always)]
     fn allocate(&self) -> Variable<Vec<usize>> {
-        Variable::uninitialized(vec![0; self.sizes.len()])
+        Variable {
+            value: vec![0; self.sizes.len()],
+            ongoing: false
+        }
     }
 
     #[inline(always)]
-    fn next(&self, current: &mut Vec<usize>) -> bool {
+    fn next(&self, current: &mut Variable<Vec<usize>>) {
         for i in 0..self.sizes.len() {
-            current[i] += 1;
-            if current[i] < self.sizes[i] {
-                return true;
+            current.value[i] += 1;
+            if current.value[i] < self.sizes[i] {
+                current.ongoing = true;
+                return;
             } else {
-                current[i] = 0;
+                current.value[i] = 0;
             }
         }
-        false
+        current.ongoing = false;
     }
 
     #[inline(always)]
-    fn reset(&self, current: &mut Vec<usize>) -> bool {
+    fn reset(&self, current: &mut Variable<Vec<usize>>) {
         for i in 0..self.sizes.len() {
-            current[i] = 0;
+            current.value[i] = 0;
         }
-        true
+        current.ongoing = true;
     }
 }
 
@@ -199,27 +168,31 @@ impl HomSet {
 impl Set<Vec<usize>> for HomSet {
     #[inline(always)]
     fn allocate(&self) -> Variable<Vec<usize>> {
-        Variable::uninitialized(vec![0; self.domain_size])
+        Variable {
+            value: vec![0; self.domain_size],
+            ongoing: false
+        }
     }
 
     #[inline(always)]
-    fn next(&self, current: &mut Vec<usize>) -> bool {
+    fn next(&self, current: &mut Variable<Vec<usize>>) {
         for i in 0..self.domain_size {
-            current[i] += 1;
-            if current[i] < self.target_size {
-                return true;
+            current.value[i] += 1;
+            if current.value[i] < self.target_size {
+                current.ongoing = true;
+                return;
             } else {
-                current[i] = 0;
+                current.value[i] = 0;
             }
         }
-        false
+        current.ongoing = false;
     }
 
     #[inline(always)]
-    fn reset(&self, current: &mut Vec<usize>) -> bool {
+    fn reset(&self, current: &mut Variable<Vec<usize>>) {
         for i in 0..self.domain_size {
-            current[i] = 0;
+            current.value[i] = 0;
         }
-        true
+        current.ongoing = true
     }
 }
