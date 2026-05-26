@@ -2,3 +2,7 @@
 name = "pshcalc"
 version = "0.1.0"
 edition = "2021"
+
+[lints.clippy]
+needless_range_loop = "allow"
+

@@ -1,7 +1,6 @@
 use pshcalc::{
     cursor,
     set::{AtomSet, HomSet, ProductSet, Set},
-    traverse,
 };
 use std::time::Instant;
 
@@ -14,9 +13,8 @@ fn main() {
     let multiplications = HomSet::new(&a_x_a.clone().into(), &a);
 
     let mut count = 0;
-    let mut f = multiplications.allocate();
-    traverse!(f in &multiplications => {
-        if is_associative(&f, &a, &a_x_a) {
+    cursor!(f in &multiplications => {
+        if is_associative(f, &a, &a_x_a) {
             count += 1;
         }
     });

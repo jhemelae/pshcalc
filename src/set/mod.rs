@@ -41,8 +41,8 @@ impl<T> Variable<T> {
 
 pub trait Set<T> {
     fn allocate(&self) -> Variable<T>;
-    fn reset<'a>(&self, current: &'a mut T) -> bool;
-    fn next<'a>(&self, current: &'a mut T) -> bool;
+    fn reset(&self, current: &mut T) -> bool;
+    fn next(&self, current: &mut T) -> bool;
 }
 
 #[macro_export]
@@ -97,38 +97,15 @@ impl Set<usize> for AtomSet {
     }
 
     #[inline(always)]
-    fn next<'a>(&self, current: &'a mut usize) -> bool {
+    fn next(&self, current: &mut usize) -> bool {
         *current += 1;
-        if *current < self.size {
-            true
-        } else {
-            false
-        }
+        *current < self.size
     }
 
     #[inline(always)]
-    fn reset<'a>(&self, current: &'a mut usize) -> bool {
+    fn reset(&self, current: &mut usize) -> bool {
         *current = 0;
-        if *current < self.size {
-            true
-        } else {
-            false
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct BinaryProductSet {
-    left: usize,
-    right: usize,
-}
-
-impl BinaryProductSet {
-    pub fn new(left: &AtomSet, right: &AtomSet) -> Self {
-        Self {
-            left: left.size(),
-            right: right.size(),
-        }
+        *current < self.size
     }
 }
 
@@ -163,7 +140,7 @@ impl Set<Vec<usize>> for ProductSet {
     }
 
     #[inline(always)]
-    fn next<'a>(&self, current: &'a mut Vec<usize>) -> bool {
+    fn next(&self, current: &mut Vec<usize>) -> bool {
         for i in 0..self.sizes.len() {
             current[i] += 1;
             if current[i] < self.sizes[i] {
@@ -176,7 +153,7 @@ impl Set<Vec<usize>> for ProductSet {
     }
 
     #[inline(always)]
-    fn reset<'a>(&self, current: &'a mut Vec<usize>) -> bool {
+    fn reset(&self, current: &mut Vec<usize>) -> bool {
         for i in 0..self.sizes.len() {
             current[i] = 0;
         }
@@ -226,7 +203,7 @@ impl Set<Vec<usize>> for HomSet {
     }
 
     #[inline(always)]
-    fn next<'a>(&self, current: &'a mut Vec<usize>) -> bool {
+    fn next(&self, current: &mut Vec<usize>) -> bool {
         for i in 0..self.domain_size {
             current[i] += 1;
             if current[i] < self.target_size {
@@ -239,7 +216,7 @@ impl Set<Vec<usize>> for HomSet {
     }
 
     #[inline(always)]
-    fn reset<'a>(&self, current: &'a mut Vec<usize>) -> bool {
+    fn reset(&self, current: &mut Vec<usize>) -> bool {
         for i in 0..self.domain_size {
             current[i] = 0;
         }

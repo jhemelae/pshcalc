@@ -26,20 +26,16 @@ pub struct Presheaf {
     pub number_of_sections: usize,
     pub number_of_objects: usize,
     pub number_of_morphisms: usize,
-    pub pi: Vec<usize>,
-    pub action: Vec<usize>,
+    pi: Vec<usize>,
+    action: Vec<usize>,
 }
 
 impl Presheaf {
     #[inline(always)]
-    pub fn new(
-        category: &Category,
-        pi: Vec<usize>,
-        action: Vec<usize>,
-    ) -> Self {
+    pub fn new(category: &Category, pi: Vec<usize>, action: Vec<usize>) -> Self {
         let number_of_sections = pi.len();
-        let number_of_morphisms = category.number_of_morphisms();
-        let number_of_objects = category.number_of_objects();
+        let number_of_morphisms = category.morphisms().size();
+        let number_of_objects = category.objects().size();
         Presheaf {
             number_of_sections,
             number_of_objects,
@@ -60,32 +56,13 @@ impl Presheaf {
             number_of_objects,
             number_of_morphisms,
             pi: vec![0; number_of_sections],
-            action: vec![
-                0;
-                number_of_sections
-                    * (number_of_morphisms - number_of_objects)
-            ],
+            action: vec![0; number_of_sections * (number_of_morphisms - number_of_objects)],
         })
     }
 
     #[inline(always)]
-    pub fn number_of_sections(&self) -> usize {
-        self.number_of_sections
-    }
-
-    #[inline(always)]
-    pub fn number_of_objects(&self) -> usize {
-        self.number_of_objects
-    }
-
-    #[inline(always)]
-    pub fn number_of_morphisms(&self) -> usize {
-        self.number_of_morphisms
-    }
-
-    #[inline(always)]
     pub fn sections(&self) -> AtomSet {
-        AtomSet::new(self.number_of_sections())
+        AtomSet::new(self.number_of_sections)
     }
 
     #[inline(always)]
@@ -96,11 +73,11 @@ impl Presheaf {
     #[inline(always)]
     pub fn action(&self, section: usize, morphism: usize) -> usize {
         // identity?
-        if morphism < self.number_of_objects() {
+        if morphism < self.number_of_objects {
             return section;
         }
-        let morphism = morphism - self.number_of_objects();
-        self.action[section + morphism * self.number_of_sections()]
+        let morphism = morphism - self.number_of_objects;
+        self.action[section + morphism * self.number_of_sections]
     }
 
     #[inline(always)]
@@ -111,10 +88,7 @@ impl Presheaf {
     }
 
     #[inline(always)]
-    fn validate_associativity(
-        &self,
-        category: &Category,
-    ) -> Result<(), PresheafError> {
+    fn validate_associativity(&self, category: &Category) -> Result<(), PresheafError> {
         let sections = self.sections();
         let morphisms = category.morphisms();
 
@@ -136,10 +110,7 @@ impl Presheaf {
     }
 
     #[inline(always)]
-    pub fn validate_well_definedness(
-        &self,
-        category: &Category,
-    ) -> Result<(), PresheafError> {
+    pub fn validate_well_definedness(&self, category: &Category) -> Result<(), PresheafError> {
         let sections = self.sections();
         let morphisms = category.morphisms();
 
@@ -181,8 +152,7 @@ impl Set<Presheaf> for PresheafSet<'_> {
     #[inline(always)]
     fn allocate(&self) -> Variable<Presheaf> {
         let number_of_nonidentity_morphisms =
-            self.category.number_of_morphisms()
-                - self.category.number_of_objects();
+            self.category.morphisms().size() - self.category.objects().size();
         let number_of_sections = self.pi.len();
         let presheaf = Presheaf::new(
             self.category,
@@ -193,12 +163,12 @@ impl Set<Presheaf> for PresheafSet<'_> {
     }
 
     #[inline(always)]
-    fn next<'a>(&self, current: &'a mut Presheaf) -> bool {
+    fn next(&self, current: &mut Presheaf) -> bool {
         let number_of_sections = self.pi.len();
         for i in 0..current.action.len() {
             current.action[i] += 1;
             if current.action[i] < number_of_sections {
-                if current.validate(&self.category).is_ok() {
+                if current.validate(self.category).is_ok() {
                     return true;
                 }
                 return self.next(current);
@@ -210,14 +180,14 @@ impl Set<Presheaf> for PresheafSet<'_> {
     }
 
     #[inline(always)]
-    fn reset<'a>(&self, current: &'a mut Presheaf) -> bool {
+    fn reset(&self, current: &mut Presheaf) -> bool {
         for i in 0..current.pi.len() {
             current.pi[i] = 0;
         }
         for i in 0..current.action.len() {
             current.action[i] = 0;
         }
-        if current.validate(&self.category).is_ok() {
+        if current.validate(self.category).is_ok() {
             return true;
         }
         self.next(current)

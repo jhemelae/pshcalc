@@ -1,4 +1,4 @@
-use pshcalc::cat::CategorySet;
+use pshcalc::cat::monoids;
 use pshcalc::cursor;
 use pshcalc::set::Set;
 use std::time::Instant;
@@ -10,10 +10,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let start = Instant::now();
 
-    let category_set = CategorySet::new(1, vec![0; n - 1], vec![0; n - 1]);
+    let monoid_set = monoids(n); 
 
     let mut count = 0;
-    cursor!(_ in &category_set => {
+    cursor!(_ in &monoid_set => {
         count += 1;
 
         if count % 100 == 0 {

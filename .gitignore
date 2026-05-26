@@ -12,3 +12,7 @@
 
 # github
 .github
+
+# vim
+*.swp
+
