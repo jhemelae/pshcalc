@@ -1,6 +1,6 @@
-use pshcalc::cat::{Category, monoids};
-use pshcalc::psh::{Presheaf, PresheafSet};
-use pshcalc::traverse;
+use pshcalc::set::Set;
+use pshcalc::cat::{monoids};
+use pshcalc::psh::{VaryAction};
 use std::time::Instant;
 
 fn avg(n: usize, m: usize) -> f64 {
@@ -11,24 +11,29 @@ fn avg(n: usize, m: usize) -> f64 {
     let start = Instant::now();
     let mut total_acts = 0;
     let mut monoid_count = 0;
-    let mut monoid = Category::allocate(1, n);
-    let mut presheaf = Presheaf::allocate(1, n, m);
     let pi = vec![0; m];
     let monoid_set = monoids(n);
+    let mut monoid = monoid_set.allocate();
 
-    traverse!(monoid in &monoid_set => {
-        let presheaf_set = PresheafSet::new(monoid, &pi);
+    monoid_set.reset(&mut monoid);
+    let presheaf_set = VaryAction::new(&monoid.value, &pi);
+    let mut presheaf = presheaf_set.allocate();
+    while monoid.ongoing {
         let mut act_count = 0;
-        traverse!(presheaf in &presheaf_set => {
+        let presheaf_set = VaryAction::new(&monoid.value, &pi);
+        presheaf_set.reset(&mut presheaf);
+        while presheaf.ongoing {
             act_count += 1;
-        });
+            presheaf_set.next(&mut presheaf);
+        };
         println!(
             "Monoid {} has {} acts of size {}",
             monoid_count, act_count, m
         );
         total_acts += act_count;
         monoid_count += 1;
-    });
+        monoid_set.next(&mut monoid);
+    }
     let average_acts = total_acts as f64 / monoid_count as f64;
     let duration = start.elapsed();
     println!(
